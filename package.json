@@ -24,6 +24,11 @@
     "claude",
     "perplexity"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sofianbettayeb/aeo-copilot-mcp.git"
+  },
+  "homepage": "https://aeo-copilot.com",
   "author": "AEO Copilot",
   "license": "MIT",
   "dependencies": {

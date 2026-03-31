@@ -1,22 +1,28 @@
 # AEO Copilot MCP Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server for [AEO Copilot](https://aeo-copilot.com) — track your brand's visibility across AI search engines like ChatGPT, Claude, and Perplexity directly from your AI assistant.
+Connect [AEO Copilot](https://aeo-copilot.com) to Claude or any MCP-compatible assistant. Ask your AI about your brand's visibility in ChatGPT, Claude, and Perplexity without switching tabs.
+
+## What is AEO Copilot?
+
+AI search engines are eating into traditional search traffic. When someone asks ChatGPT "What's the best tool for X?", your brand either shows up or it doesn't — and unlike Google, there's no ranking page to check.
+
+[AEO Copilot](https://aeo-copilot.com) runs prompts against ChatGPT, Claude, and Perplexity and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
 
 ## Tools
 
 | Tool | Description |
 |------|-------------|
-| `list_brands` | List all brands you have access to |
-| `list_topics` | List topics configured for a brand |
-| `get_results` | Get prompt execution results (mentions, position, sentiment) per AI engine |
-| `get_insights` | Get analytics: visibility score, sentiment, competitive share, trends |
-| `get_recommendations` | Get prioritised recommendations to improve AI visibility |
+| `list_brands` | List all brands on your account |
+| `list_topics` | List topics for a brand (e.g. "Product Comparisons", "Pricing Questions") |
+| `get_results` | Per-prompt results across ChatGPT, Claude, and Perplexity: mention status, position, sentiment, sources, competitors |
+| `get_insights` | Aggregated analytics: visibility score, sentiment counts, competitive share, weekly trends, top topics |
+| `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
 
 ## Setup
 
 ### 1. Get your API key
 
-Log in to [aeo-copilot.com](https://aeo-copilot.com), go to **Settings → API Keys**, and generate a key. It will start with `aeo_`.
+Log in to [aeo-copilot.com](https://aeo-copilot.com), go to **Settings > API Keys**, and generate a key. It starts with `aeo_`.
 
 ### 2. Add to Claude Code
 
@@ -24,7 +30,12 @@ Log in to [aeo-copilot.com](https://aeo-copilot.com), go to **Settings → API K
 claude mcp add aeo-copilot -e AEO_COPILOT_API_KEY=aeo_your_key_here -- npx aeo-copilot-mcp
 ```
 
-Or add to your `~/.claude/claude_desktop_config.json` manually:
+### 3. Add to Claude Desktop
+
+Edit `claude_desktop_config.json`:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -40,22 +51,73 @@ Or add to your `~/.claude/claude_desktop_config.json` manually:
 }
 ```
 
-### 3. Use it
+Restart Claude Desktop after saving.
 
-Ask your assistant things like:
+## What you can ask
 
-- _"What's the AI visibility score for my brand?"_
-- _"Which prompts mention my competitors but not me?"_
-- _"What should I do to improve my brand's AI visibility?"_
-- _"Show me my brand's sentiment trend over the last month"_
+- "What's my brand's AI visibility score?"
+- "Which prompts mention my competitors but not me?"
+- "Show me my visibility trend for the last 30 days"
+- "What topics are performing best in AI search?"
+- "What should I fix to improve my AI visibility?"
+- "How does my brand compare to [competitor] in AI-generated answers?"
+- "What's the sentiment breakdown for my brand mentions?"
+
+## API reference
+
+### `list_brands`
+```
+GET /api/v1/brands
+```
+Returns all brands on your account: name, website, industry, products, competitors.
+
+### `list_topics`
+```
+GET /api/v1/brands/:id/topics
+```
+Topics group related prompts. Each topic has a name, description, target pages, and keywords.
+
+### `get_results`
+```
+GET /api/v1/brands/:id/results
+```
+Per-prompt results. Each entry includes mention status, position, sentiment, sources cited, and competitors — broken down by AI engine.
+
+Optional filters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `topicId` | string | Filter by topic |
+| `from` | ISO date | Start date, e.g. `2025-01-01` |
+| `to` | ISO date | End date |
+| `limit` | number | Max results (default 100, max 500) |
+
+### `get_insights`
+```
+GET /api/v1/brands/:id/insights
+```
+Aggregated analytics:
+
+- Visibility score: percentage of prompts where your brand was mentioned
+- Sentiment: positive, neutral, and negative counts
+- Competitive share: your mentions vs. competitor mentions
+- Visibility trend: week-by-week breakdown
+- Top topics: which groups are driving the most visibility
+- Competitor breakdown: how often each competitor appears
+
+### `get_recommendations`
+```
+GET /api/v1/brands/:id/recommendations
+```
+Prioritised recommendations (high / medium / low) across visibility, content, and technical categories.
 
 ## Development
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/aeo-copilot-mcp
+git clone https://github.com/sofianbettayeb/aeo-copilot-mcp
 cd aeo-copilot-mcp
 npm install
-npm run dev
+AEO_COPILOT_API_KEY=aeo_your_key npm run dev
 ```
 
 ## License
