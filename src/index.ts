@@ -10,7 +10,7 @@ function getApiKey(): string {
   if (!key) {
     throw new Error(
       "AEO_COPILOT_API_KEY environment variable is not set. " +
-        "Generate an API key at https://aeo-copilot.com/settings/api-keys"
+        "Create one at https://aeo-copilot.com/settings (Settings → API → Create API key)."
     );
   }
   return key;

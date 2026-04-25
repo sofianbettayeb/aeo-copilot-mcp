@@ -22,7 +22,12 @@ AI search engines are eating into traditional search traffic. When someone asks 
 
 ### 1. Get your API key
 
-Log in to [aeo-copilot.com](https://aeo-copilot.com), go to **Settings > API Keys**, and generate a key. It starts with `aeo_`.
+1. Log in to [aeo-copilot.com](https://aeo-copilot.com)
+2. Go to **Settings → API**
+3. Click **Create API key**
+4. Copy the key — it starts with `aeo_`
+
+Keep it somewhere safe; you won't be able to see the full key again after closing the dialog.
 
 ### 2. Add to Claude Code
 
