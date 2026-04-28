@@ -1,12 +1,12 @@
 # AEO Copilot MCP Server
 
-Connect [AEO Copilot](https://aeo-copilot.com) to Claude or any MCP-compatible assistant. Ask your AI about your brand's visibility in ChatGPT, Claude, and Perplexity without switching tabs.
+Connect [AEO Copilot](https://aeo-copilot.com) to Claude or any MCP-compatible assistant. Ask your AI about your brand's visibility in ChatGPT, Claude, Perplexity, and Google AI Overviews without switching tabs.
 
 ## What is AEO Copilot?
 
 AI search engines are eating into traditional search traffic. When someone asks ChatGPT "What's the best tool for X?", your brand either shows up or it doesn't — and unlike Google, there's no ranking page to check.
 
-[AEO Copilot](https://aeo-copilot.com) runs prompts against ChatGPT, Claude, and Perplexity and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
+[AEO Copilot](https://aeo-copilot.com) runs prompts against ChatGPT, Claude, Perplexity, and Google AI Overviews and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
 
 ## Tools
 
@@ -14,9 +14,14 @@ AI search engines are eating into traditional search traffic. When someone asks 
 |------|-------------|
 | `list_brands` | List all brands on your account |
 | `list_topics` | List topics for a brand (e.g. "Product Comparisons", "Pricing Questions") |
-| `get_results` | Per-prompt results across ChatGPT, Claude, and Perplexity: mention status, position, sentiment, sources, competitors |
+| `get_results` | Per-prompt results across ChatGPT, Claude, Perplexity, and Google AI Overviews: mention status, position, sentiment, sources, competitors |
 | `get_insights` | Aggregated analytics: visibility score, sentiment counts, competitive share, weekly trends, top topics |
 | `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
+| `create_brand` | Create a new brand (subject to your plan's brand limit) |
+| `create_topic` | Create a topic cluster for a brand |
+| `add_prompts` | Bulk-add prompts to a brand under a topic (subject to your plan's monthly prompt limit) |
+| `run_brand_prompts` | Run all prompts for a brand (or one topic) across every enabled LLM |
+| `scan_brand` | Run the technical audit on the brand's website and return the full scan result |
 
 ## Setup
 
@@ -115,6 +120,36 @@ Aggregated analytics:
 GET /api/v1/brands/:id/recommendations
 ```
 Prioritised recommendations (high / medium / low) across visibility, content, and technical categories.
+
+### `create_brand`
+```
+POST /api/v1/brands
+```
+Create a new brand. Body: `name` (required), `website`, `industry`, `products[]`, `competitors[]`. Returns 402 if you've hit your plan's brand limit.
+
+### `create_topic`
+```
+POST /api/v1/brands/:id/topics
+```
+Create a topic cluster. Body: `name` (required), `description`, `pages[]`, `keywords[]`.
+
+### `add_prompts`
+```
+POST /api/v1/brands/:id/prompts
+```
+Bulk-add prompts under a topic. Body: `topicId` (required), `prompts[]` (required, array of strings). Returns 402 if adding these prompts would exceed your plan's monthly prompt limit.
+
+### `run_brand_prompts`
+```
+POST /api/v1/brands/:id/run
+```
+Run all prompts across every enabled LLM. Optional query param `topicId` to scope to a single topic. Returns the count of prompts run.
+
+### `scan_brand`
+```
+POST /api/v1/brands/:id/scan
+```
+Run the technical audit on the brand's website. Returns the full scan result (schema markup, sitemap, llms.txt, etc.) — same data the dashboard's technical scan view shows.
 
 ## Development
 

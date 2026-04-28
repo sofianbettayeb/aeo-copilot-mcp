@@ -1,7 +1,7 @@
 {
   "name": "aeo-copilot-mcp",
   "version": "1.0.0",
-  "description": "MCP server for AEO Copilot — track your brand's AI visibility across ChatGPT, Claude, and Perplexity",
+  "description": "MCP server for AEO Copilot — track your brand's AI visibility across ChatGPT, Claude, Perplexity, and Google AI Overviews",
   "type": "module",
   "bin": {
     "aeo-copilot-mcp": "dist/index.js"
@@ -22,7 +22,9 @@
     "brand-monitoring",
     "chatgpt",
     "claude",
-    "perplexity"
+    "perplexity",
+    "google-aio",
+    "ai-overviews"
   ],
   "repository": {
     "type": "git",

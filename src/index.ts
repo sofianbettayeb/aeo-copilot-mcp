@@ -16,15 +16,21 @@ function getApiKey(): string {
   return key;
 }
 
-async function apiFetch(path: string): Promise<unknown> {
+async function apiFetch(
+  path: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<unknown> {
   const apiKey = getApiKey();
   const url = `${BASE_URL}${path}`;
+  const method = options.method ?? "GET";
 
   const res = await fetch(url, {
+    method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
   if (!res.ok) {
@@ -74,7 +80,7 @@ server.tool(
 
 server.tool(
   "get_results",
-  "Get prompt execution results for a brand across AI engines (ChatGPT, Claude, Perplexity). Shows whether your brand was mentioned, its position, sentiment, and which competitors appeared.",
+  "Get prompt execution results for a brand across AI engines (ChatGPT, Claude, Perplexity, Google AI Overviews). Shows whether your brand was mentioned, its position, sentiment, and which competitors appeared.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     topicId: z
@@ -138,6 +144,141 @@ server.tool(
   },
   async ({ brandId }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/recommendations`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: create_brand ────────────────────────────────────────────────────────
+
+server.tool(
+  "create_brand",
+  "Create a new brand on your AEO Copilot account. Subject to your plan's brand limit — the API will return an error if you've reached it.",
+  {
+    name: z.string().min(1).describe("Brand name"),
+    website: z
+      .string()
+      .url()
+      .optional()
+      .describe("Brand website URL (e.g. https://example.com)"),
+    industry: z.string().optional().describe("Industry or vertical"),
+    products: z
+      .array(z.string())
+      .optional()
+      .describe("List of products or services the brand offers"),
+    competitors: z
+      .array(z.string())
+      .optional()
+      .describe("List of competitor names"),
+  },
+  async ({ name, website, industry, products, competitors }) => {
+    const data = await apiFetch("/api/v1/brands", {
+      method: "POST",
+      body: { name, website, industry, products, competitors },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: create_topic ────────────────────────────────────────────────────────
+
+server.tool(
+  "create_topic",
+  "Create a topic cluster for a brand. Topics group related prompts (e.g. 'Pricing Questions', 'Product Comparisons').",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    name: z.string().min(1).describe("Topic name"),
+    description: z
+      .string()
+      .optional()
+      .describe("What this topic covers"),
+    pages: z
+      .array(z.string())
+      .optional()
+      .describe("Target page URLs that the topic should drive traffic to"),
+    keywords: z
+      .array(z.string())
+      .optional()
+      .describe("Keywords associated with this topic"),
+  },
+  async ({ brandId, name, description, pages, keywords }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/topics`, {
+      method: "POST",
+      body: { name, description, pages, keywords },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: add_prompts ─────────────────────────────────────────────────────────
+
+server.tool(
+  "add_prompts",
+  "Bulk-add prompts to a brand under a specific topic. Subject to your plan's monthly prompt limit — the API will return an error if you've reached it.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    topicId: z
+      .string()
+      .describe("The topic UUID from list_topics — prompts are grouped under a topic"),
+    prompts: z
+      .array(z.string().min(1))
+      .min(1)
+      .describe("Array of prompt strings to add"),
+  },
+  async ({ brandId, topicId, prompts }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/prompts`, {
+      method: "POST",
+      body: { topicId, prompts },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: run_brand_prompts ───────────────────────────────────────────────────
+
+server.tool(
+  "run_brand_prompts",
+  "Run all prompts for a brand across every enabled LLM (ChatGPT, Claude, Perplexity, Google AI Overviews). Optionally filter to a single topic. Returns the count of prompts run.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    topicId: z
+      .string()
+      .optional()
+      .describe("Optional topic UUID — if provided, only that topic's prompts run"),
+  },
+  async ({ brandId, topicId }) => {
+    const params = new URLSearchParams();
+    if (topicId) params.set("topicId", topicId);
+    const query = params.toString() ? `?${params.toString()}` : "";
+
+    const data = await apiFetch(`/api/v1/brands/${brandId}/run${query}`, {
+      method: "POST",
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: scan_brand ──────────────────────────────────────────────────────────
+
+server.tool(
+  "scan_brand",
+  "Run a technical audit on the brand's website. Returns the full scan result — same data the dashboard's technical scan view shows (schema markup, sitemap, llms.txt, etc.).",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/scan`, {
+      method: "POST",
+    });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     };
