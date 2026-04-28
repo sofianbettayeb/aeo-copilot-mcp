@@ -285,6 +285,176 @@ server.tool(
   }
 );
 
+// ── Tool: create_index ────────────────────────────────────────────────────────
+
+server.tool(
+  "create_index",
+  "Create an industry index — a brand-agnostic view of an industry that tracks every entity cited across prompts (no single brand is the focus).",
+  {
+    name: z.string().min(1).describe("Index name"),
+    industry: z.string().min(1).describe("Industry or vertical the index covers"),
+    description: z
+      .string()
+      .optional()
+      .describe("What this index is tracking"),
+  },
+  async ({ name, industry, description }) => {
+    const data = await apiFetch("/api/v1/indexes", {
+      method: "POST",
+      body: { name, industry, description },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: list_indexes ────────────────────────────────────────────────────────
+
+server.tool(
+  "list_indexes",
+  "List all industry indexes you have access to in AEO Copilot.",
+  {},
+  async () => {
+    const data = await apiFetch("/api/v1/indexes");
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: add_index_topic ─────────────────────────────────────────────────────
+
+server.tool(
+  "add_index_topic",
+  "Add a topic cluster to an industry index. Topics group related prompts (e.g. 'Pricing Questions', 'Best-of Comparisons').",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+    name: z.string().min(1).describe("Topic name"),
+    description: z
+      .string()
+      .optional()
+      .describe("What this topic covers"),
+  },
+  async ({ indexId, name, description }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/topics`, {
+      method: "POST",
+      body: { name, description },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: add_index_prompts ───────────────────────────────────────────────────
+
+server.tool(
+  "add_index_prompts",
+  "Bulk-add prompts to a topic in an industry index.",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+    topicId: z
+      .string()
+      .describe("The topic UUID — prompts are grouped under a topic"),
+    prompts: z
+      .array(z.string().min(1))
+      .min(1)
+      .describe("Array of prompt strings to add"),
+  },
+  async ({ indexId, topicId, prompts }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/prompts`, {
+      method: "POST",
+      body: { topicId, prompts },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: run_index_prompts ───────────────────────────────────────────────────
+
+server.tool(
+  "run_index_prompts",
+  "Run all prompts in an index across all 4 LLMs (ChatGPT, Claude, Perplexity, Google AI Overviews) and store full per-LLM results. No brand filter — every entity mentioned is captured.",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+  },
+  async ({ indexId }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/run`, {
+      method: "POST",
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_index_results ───────────────────────────────────────────────────
+
+server.tool(
+  "get_index_results",
+  "Get raw per-prompt results for an industry index across all 4 LLMs. Same shape as get_results minus the brand-mention fields — every cited entity is captured.",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+  },
+  async ({ indexId }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/results`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_index_share_of_voice ────────────────────────────────────────────
+
+server.tool(
+  "get_index_share_of_voice",
+  "Get the ranked entity list for an index by citation frequency, plus a concentration score (top-1 share % and HHI-style index showing how concentrated mentions are).",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+  },
+  async ({ indexId }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/share-of-voice`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_index_sources ───────────────────────────────────────────────────
+
+server.tool(
+  "get_index_sources",
+  "Get domains ranked by citation frequency across every LLM response in the index — which sources the AI engines lean on most.",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+  },
+  async ({ indexId }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/sources`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_index_whitespace ────────────────────────────────────────────────
+
+server.tool(
+  "get_index_whitespace",
+  "Find whitespace opportunities in an index: prompts and topics where no entity is consistently cited (threshold: fewer than 1 consistent entity across at least 50% of runs). These are gaps where a brand could establish authority.",
+  {
+    indexId: z.string().describe("The index UUID from list_indexes"),
+  },
+  async ({ indexId }) => {
+    const data = await apiFetch(`/api/v1/indexes/${indexId}/whitespace`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
 // ── Start server ──────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport();

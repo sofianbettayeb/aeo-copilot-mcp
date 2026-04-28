@@ -22,6 +22,15 @@ AI search engines are eating into traditional search traffic. When someone asks 
 | `add_prompts` | Bulk-add prompts to a brand under a topic (subject to your plan's monthly prompt limit) |
 | `run_brand_prompts` | Run all prompts for a brand (or one topic) across every enabled LLM |
 | `scan_brand` | Run the technical audit on the brand's website and return the full scan result |
+| `create_index` | Create an industry index (brand-agnostic — every cited entity is captured) |
+| `list_indexes` | List all industry indexes on your account |
+| `add_index_topic` | Add a topic cluster to an index |
+| `add_index_prompts` | Bulk-add prompts to a topic in an index |
+| `run_index_prompts` | Run all index prompts across all 4 LLMs and store full per-LLM results |
+| `get_index_results` | Raw per-prompt results for an index across all LLMs |
+| `get_index_share_of_voice` | Ranked entity list by citation frequency + concentration score (top-1 share, HHI) |
+| `get_index_sources` | Domains ranked by citation frequency across every LLM response |
+| `get_index_whitespace` | Prompts/topics where no entity is consistently cited — opportunity gaps |
 
 ## Setup
 
@@ -150,6 +159,67 @@ Run all prompts across every enabled LLM. Optional query param `topicId` to scop
 POST /api/v1/brands/:id/scan
 ```
 Run the technical audit on the brand's website. Returns the full scan result (schema markup, sitemap, llms.txt, etc.) — same data the dashboard's technical scan view shows.
+
+## Industry indexes
+
+Indexes are brand-agnostic: instead of tracking how *your* brand is mentioned, an index tracks **every entity** cited across an industry's prompts. Useful for category mapping, competitive whitespace, and seeing which sources the LLMs lean on.
+
+### `create_index`
+```
+POST /api/v1/indexes
+```
+Create an industry index. Body: `name` (required), `industry` (required), `description`.
+
+### `list_indexes`
+```
+GET /api/v1/indexes
+```
+List all indexes on your account.
+
+### `add_index_topic`
+```
+POST /api/v1/indexes/:id/topics
+```
+Add a topic cluster. Body: `name` (required), `description`.
+
+### `add_index_prompts`
+```
+POST /api/v1/indexes/:id/prompts
+```
+Bulk-add prompts under a topic. Body: `topicId` (required), `prompts[]` (required, array of strings).
+
+### `run_index_prompts`
+```
+POST /api/v1/indexes/:id/run
+```
+Run every prompt across all 4 LLMs (ChatGPT, Claude, Perplexity, Google AI Overviews). All extracted entities are stored as competitors — no brand filter.
+
+### `get_index_results`
+```
+GET /api/v1/indexes/:id/results
+```
+Raw per-prompt results across all LLMs. Same shape as `/brands/:id/results` minus the brand-mention fields.
+
+### `get_index_share_of_voice`
+```
+GET /api/v1/indexes/:id/share-of-voice
+```
+Ranked entity list by citation frequency, plus a concentration score:
+
+- `top1Share`: the % of mentions held by the most-cited entity
+- `hhi`: an HHI-style index (sum of squared shares × 10,000) showing how concentrated mentions are. Higher = more dominated by a few entities.
+
+### `get_index_sources`
+```
+GET /api/v1/indexes/:id/sources
+```
+Domains ranked by citation frequency across every LLM response in the index.
+
+### `get_index_whitespace`
+```
+GET /api/v1/indexes/:id/whitespace
+```
+Prompts and topics where **no entity is consistently cited** — i.e. fewer than 1 consistent entity appears across at least 50% of runs. These are the gaps where a brand can establish authority before the category solidifies.
 
 ## Development
 
