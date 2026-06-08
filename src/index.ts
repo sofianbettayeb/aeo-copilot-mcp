@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.0.0",
+  version: "1.0.1",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ server.tool(
   async ({ brandId, topicId, prompts }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/prompts`, {
       method: "POST",
-      body: { topicId, prompts },
+      body: { topicId, prompts: prompts.map((text) => ({ text })) },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
@@ -365,7 +365,7 @@ server.tool(
   async ({ indexId, topicId, prompts }) => {
     const data = await apiFetch(`/api/v1/indexes/${indexId}/prompts`, {
       method: "POST",
-      body: { topicId, prompts },
+      body: { topicId, prompts: prompts.map((text) => ({ text })) },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
