@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.0.1",
+  version: "1.0.2",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -80,13 +80,19 @@ server.tool(
 
 server.tool(
   "get_results",
-  "Get prompt execution results for a brand across AI engines (ChatGPT, Claude, Perplexity, Google AI Overviews). Shows whether your brand was mentioned, its position, sentiment, and which competitors appeared.",
+  "Get prompt execution results for a brand across AI engines (ChatGPT, Claude, Perplexity, Google AI Overviews). Each result includes a per-engine block with the full answer text (`response`), plus whether your brand was mentioned, its position, sentiment, sources, and which competitors appeared. Set `engine` to return only one engine's answers — e.g. 'claude' to read exactly what Claude said.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     topicId: z
       .string()
       .optional()
       .describe("Filter results to a specific topic UUID"),
+    engine: z
+      .enum(["chatgpt", "claude", "perplexity", "googleAio"])
+      .optional()
+      .describe(
+        "Return only this engine's answer/response for each prompt (e.g. 'claude'). Omit to get every engine's block."
+      ),
     from: z
       .string()
       .optional()
@@ -103,7 +109,7 @@ server.tool(
       .optional()
       .describe("Max results to return (default 100, max 500)"),
   },
-  async ({ brandId, topicId, from, to, limit }) => {
+  async ({ brandId, topicId, engine, from, to, limit }) => {
     const params = new URLSearchParams();
     if (topicId) params.set("topicId", topicId);
     if (from) params.set("from", from);
@@ -111,9 +117,40 @@ server.tool(
     if (limit !== undefined) params.set("limit", String(limit));
 
     const query = params.toString() ? `?${params.toString()}` : "";
-    const data = await apiFetch(`/api/v1/brands/${brandId}/results${query}`);
+    const data = (await apiFetch(
+      `/api/v1/brands/${brandId}/results${query}`
+    )) as { data?: unknown[]; total?: number };
+
+    // The API has no server-side engine filter — it always returns all four
+    // engine blocks. When the caller asks for one engine, flatten each result
+    // to that engine's answer so the payload is focused (and much smaller).
+    let payload: unknown = data;
+    if (engine && Array.isArray(data?.data)) {
+      const filtered = (data.data as Record<string, any>[])
+        .map((r) => {
+          const block = r[engine];
+          if (!block) return null; // engine not run for this prompt
+          return {
+            promptId: r.promptId,
+            promptText: r.promptText,
+            topicId: r.topicId,
+            topicName: r.topicName,
+            runDate: r.runDate,
+            engine,
+            mentioned: block.mentioned,
+            position: block.position,
+            sentiment: block.sentiment,
+            sources: block.sources,
+            competitors: block.competitors,
+            response: block.response ?? null,
+          };
+        })
+        .filter(Boolean);
+      payload = { data: filtered, total: filtered.length, engine };
+    }
+
     return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
     };
   }
 );

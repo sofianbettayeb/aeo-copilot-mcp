@@ -1,6 +1,6 @@
 {
   "name": "aeo-copilot-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP server for AEO Copilot — track your brand's AI visibility across ChatGPT, Claude, Perplexity, and Google AI Overviews",
   "type": "module",
   "bin": {
