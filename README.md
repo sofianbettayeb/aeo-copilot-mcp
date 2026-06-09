@@ -14,7 +14,7 @@ AI search engines are eating into traditional search traffic. When someone asks 
 |------|-------------|
 | `list_brands` | List all brands on your account |
 | `list_topics` | List topics for a brand (e.g. "Product Comparisons", "Pricing Questions") |
-| `get_results` | Per-prompt results across ChatGPT, Claude, Perplexity, and Google AI Overviews: mention status, position, sentiment, sources, competitors |
+| `get_results` | Per-prompt results across ChatGPT, Claude, Perplexity, and Google AI Overviews: mention status, position, sentiment, sources, competitors, and the full answer text. Set `engine` to read just one LLM's answers (e.g. Claude) |
 | `get_insights` | Aggregated analytics: visibility score, sentiment counts, competitive share, weekly trends, top topics |
 | `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
 | `create_brand` | Create a new brand (subject to your plan's brand limit) |
@@ -75,6 +75,7 @@ Restart Claude Desktop after saving.
 ## What you can ask
 
 - "What's my brand's AI visibility score?"
+- "Show me exactly what Claude said about my brand"
 - "Which prompts mention my competitors but not me?"
 - "Show me my visibility trend for the last 30 days"
 - "What topics are performing best in AI search?"
@@ -100,16 +101,19 @@ Topics group related prompts. Each topic has a name, description, target pages, 
 ```
 GET /api/v1/brands/:id/results
 ```
-Per-prompt results. Each entry includes mention status, position, sentiment, sources cited, and competitors — broken down by AI engine.
+Per-prompt results. Each entry includes mention status, position, sentiment, sources cited, and competitors — broken down by AI engine. Every engine block also carries `response`: the **full answer text** that engine returned for the prompt.
 
 Optional filters:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `topicId` | string | Filter by topic |
+| `engine` | string | Return only one engine's answers: `chatgpt`, `claude`, `perplexity`, or `googleAio`. Each result is flattened to that engine's block (including its `response` text) and prompts where it wasn't run are omitted. Omit to get every engine |
 | `from` | ISO date | Start date, e.g. `2025-01-01` |
 | `to` | ISO date | End date |
 | `limit` | number | Max results (default 100, max 500) |
+
+> The API has no server-side `engine` filter — it always returns all four engine blocks. The MCP server applies the `engine` filter client-side so you get a focused, smaller payload when you only want one LLM (e.g. exactly what Claude said).
 
 ### `get_insights`
 ```
