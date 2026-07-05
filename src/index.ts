@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.0.2",
+  version: "1.1.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -271,6 +271,82 @@ server.tool(
     const data = await apiFetch(`/api/v1/brands/${brandId}/prompts`, {
       method: "POST",
       body: { topicId, prompts: prompts.map((text) => ({ text })) },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: update_prompt ───────────────────────────────────────────────────────
+
+const promptEditFields = {
+  text: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("New prompt text. Past results stay linked to this prompt; future runs use the new text."),
+  llm: z
+    .string()
+    .optional()
+    .describe("LLM engine label (one of: ChatGPT, Claude, Perplexity, Google AIO)"),
+  topicId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("Move the prompt to another topic UUID (must belong to the same brand), or null to ungroup"),
+  recommendationPageUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("Target page URL this prompt should drive traffic to, or null to clear"),
+};
+
+server.tool(
+  "update_prompt",
+  "Edit a single prompt: its text, topic, or target page URL. Editing the text keeps all past results linked to the prompt — only future runs use the new wording.",
+  {
+    promptId: z.string().describe("The prompt UUID (from get_results promptId)"),
+    ...promptEditFields,
+  },
+  async ({ promptId, ...fields }) => {
+    const body = Object.fromEntries(
+      Object.entries(fields).filter(([, v]) => v !== undefined)
+    );
+    const data = await apiFetch(`/api/v1/prompts/${promptId}`, {
+      method: "PATCH",
+      body,
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: update_prompts ──────────────────────────────────────────────────────
+
+server.tool(
+  "update_prompts",
+  "Bulk-edit up to 50 prompts in one call. Each update needs the prompt's id plus the fields to change (text, llm, topicId, recommendationPageUrl). Items are processed independently — the response reports how many updated and which failed, so you can retry just the failures. Editing text keeps past results linked; only future runs use the new wording.",
+  {
+    updates: z
+      .array(
+        z.object({
+          id: z.string().describe("The prompt UUID"),
+          ...promptEditFields,
+        })
+      )
+      .min(1)
+      .max(50)
+      .describe("Array of prompt updates (max 50)"),
+  },
+  async ({ updates }) => {
+    const cleaned = updates.map((u) =>
+      Object.fromEntries(Object.entries(u).filter(([, v]) => v !== undefined))
+    );
+    const data = await apiFetch("/api/v1/prompts", {
+      method: "PATCH",
+      body: { updates: cleaned },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
