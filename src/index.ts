@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -347,6 +347,29 @@ server.tool(
     const data = await apiFetch("/api/v1/prompts", {
       method: "PATCH",
       body: { updates: cleaned },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: delete_prompts ──────────────────────────────────────────────────────
+
+server.tool(
+  "delete_prompts",
+  "Delete 1 to 50 prompts by id. This is a soft delete: the prompts stop collecting data immediately, stay restorable from the web app's Recently deleted view for 48 hours, and are then permanently removed along with their results. Prompts you don't own are skipped and reported back, not failed.",
+  {
+    promptIds: z
+      .array(z.string())
+      .min(1)
+      .max(50)
+      .describe("Prompt UUIDs to delete (from get_results promptId)"),
+  },
+  async ({ promptIds }) => {
+    const data = await apiFetch("/api/v1/prompts/bulk-delete", {
+      method: "POST",
+      body: { promptIds },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
