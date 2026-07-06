@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -347,6 +347,87 @@ server.tool(
     const data = await apiFetch("/api/v1/prompts", {
       method: "PATCH",
       body: { updates: cleaned },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: list_prompts ────────────────────────────────────────────────────────
+
+server.tool(
+  "list_prompts",
+  "List all prompts for a brand with their ids, text, topic, target page, last run date, and paused state. Use this to discover prompt ids for update_prompt, update_prompts, and delete_prompts — including prompts that have never been run (which get_results cannot see).",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    topicId: z
+      .string()
+      .optional()
+      .describe("Optional topic UUID — if provided, only that topic's prompts are returned"),
+  },
+  async ({ brandId, topicId }) => {
+    const params = new URLSearchParams();
+    if (topicId) params.set("topicId", topicId);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const data = await apiFetch(`/api/v1/brands/${brandId}/prompts${query}`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: list_deleted_prompts ────────────────────────────────────────────────
+
+server.tool(
+  "list_deleted_prompts",
+  "List recently deleted prompts for a brand that are still restorable (48-hour grace window), grouped by delete batch with sample texts and expiry. Use the batchId with restore_prompts to undo a deletion.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/prompts/deleted?brandId=${encodeURIComponent(brandId)}`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: restore_prompts ─────────────────────────────────────────────────────
+
+server.tool(
+  "restore_prompts",
+  "Restore a batch of recently deleted prompts (undo a delete_prompts call). Works while the batch is still inside the 48-hour grace window; get the batchId from list_deleted_prompts or from the delete_prompts response.",
+  {
+    batchId: z.string().describe("The delete batch UUID from list_deleted_prompts or delete_prompts"),
+  },
+  async ({ batchId }) => {
+    const data = await apiFetch("/api/v1/prompts/bulk-restore", {
+      method: "POST",
+      body: { batchId },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: delete_prompts ──────────────────────────────────────────────────────
+
+server.tool(
+  "delete_prompts",
+  "Delete 1 to 50 prompts by id. This is a soft delete: the prompts stop collecting data immediately, stay restorable from the web app's Recently deleted view for 48 hours, and are then permanently removed along with their results. Prompts you don't own are skipped and reported back, not failed.",
+  {
+    promptIds: z
+      .array(z.string())
+      .min(1)
+      .max(50)
+      .describe("Prompt UUIDs to delete (from get_results promptId)"),
+  },
+  async ({ promptIds }) => {
+    const data = await apiFetch("/api/v1/prompts/bulk-delete", {
+      method: "POST",
+      body: { promptIds },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
