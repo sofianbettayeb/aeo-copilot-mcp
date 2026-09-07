@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.2.0",
+  version: "1.3.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -643,6 +643,65 @@ server.tool(
   },
   async ({ indexId }) => {
     const data = await apiFetch(`/api/v1/indexes/${indexId}/whitespace`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: discover_audit_pages ────────────────────────────────────────────────
+
+server.tool(
+  "discover_audit_pages",
+  "Step 1 of the deep AEO tech audit: list the brand site's URLs (sitemap-first, crawl fallback), grouped by source, with the saved selection and a smart default selection. Use it to review or change which pages run_deep_audit will test.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/audit/discover`, {
+      method: "POST",
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: run_deep_audit ──────────────────────────────────────────────────────
+
+server.tool(
+  "run_deep_audit",
+  "Run the deep AEO tech audit on a brand: every selected page is fetched with 9 AI crawler identities (GPTBot, ClaudeBot, PerplexityBot, etc.) comparing status and response size, robots.txt is parsed per crawler token, and the raw HTML is parsed for structure, metadata, structured data (incl. whether FAQ answers are carried in full), and attribute-JSON payloads. Returns layer verdicts, severity-ranked findings, the access matrix, and per-page parseability. Takes up to 2 minutes. Omit urls to use the brand's saved page selection (or a smart default). Limitation: crawler identities are tested from a regular IP, so IP-verified bot blocking will not show.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    urls: z
+      .array(z.string().url())
+      .min(1)
+      .max(20)
+      .optional()
+      .describe("Pages to audit (1-20). Omit to use the saved selection, else a smart default (homepage + tracked pages + sitemap sample)"),
+  },
+  async ({ brandId, urls }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/audit/run`, {
+      method: "POST",
+      body: urls ? { urls } : {},
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_audit_result ────────────────────────────────────────────────────
+
+server.tool(
+  "get_audit_result",
+  "Get the latest stored tech-audit result for a brand without re-running it: layer verdicts (access / rendering / parseability), findings, crawler-access matrix, robots.txt per AI token, and per-page parseability. Deep-audit fields are null if only the legacy quick scan has run.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/audit/result`);
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     };
