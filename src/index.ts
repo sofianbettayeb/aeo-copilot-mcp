@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.3.0",
+  version: "1.4.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ server.tool(
 
 server.tool(
   "get_insights",
-  "Get analytics insights for a brand: overall visibility score, sentiment breakdown, competitive share, visibility trends over time, top-performing topics, and competitor breakdown.",
+  "Get the overview metrics for a brand, the same numbers the Overview page shows. `visibility` is the % of answers that name the brand (1 answer = 1 prompt on 1 engine, latest result per active prompt), `visibilityDelta` the change in points against each prompt's previous result, `engines` the split by ChatGPT, Claude, Perplexity and Google AI Overview, `shareOfVoice` the brand's mentions as a share of all mentions of the brand and its tracked competitors. Also returns `run` (Baseline or Pulse, last and next run), `changes` (prompts where engines stopped or started naming the brand, and who was named instead), `competitors` (brand and competitors ranked on the same metric), `gap` (answers naming a competitor but not the brand), `reputation` (sentiment on answers that name the brand, with an excerpt), `sources` (cited domains), `topics`, top `recommendations`, plus the legacy fields sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume and competitorBreakdown.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
   },
