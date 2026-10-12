@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.4.0",
+  version: "1.5.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -165,6 +165,22 @@ server.tool(
   },
   async ({ brandId }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/insights`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_reputation ──────────────────────────────────────────────────────
+
+server.tool(
+  "get_reputation",
+  "For a Reputation-mode brand: whether AI engines get the brand right, checked against the brand facts the owner saved. Returns `status` (graded, grading, no_facts, not_on_plan, no_runs), `problems` by type (wrong_product, contradicts, outdated, not_named, doesnt_know), problems per engine, `fixes` (each with the quoted sentence, the fact it conflicts with, the prompts, the engine and cited sources), a prompts x engines `matrix` of verdicts, `tone` on answers with no problem, `changes` since the previous run, `sources`, and the saved `facts`. 'No problem found' means nothing conflicts with the saved facts, not that the answer is verified.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands (must be a Reputation-mode brand)"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/reputation`);
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     };
