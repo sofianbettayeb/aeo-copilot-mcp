@@ -43,7 +43,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.3.0",
+  version: "1.4.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
