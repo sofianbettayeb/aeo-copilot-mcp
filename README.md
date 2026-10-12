@@ -15,8 +15,12 @@ AI search engines are eating into traditional search traffic. When someone asks 
 | `list_brands` | List all brands on your account |
 | `list_topics` | List topics for a brand (e.g. "Product Comparisons", "Pricing Questions") |
 | `get_results` | Per-prompt results across ChatGPT, Claude, Perplexity, and Google AI Overviews: mention status, position, sentiment, sources, competitors, and the full answer text. Set `engine` to read just one LLM's answers (e.g. Claude) |
-| `get_insights` | Aggregated analytics: visibility score, sentiment counts, competitive share, weekly trends, top topics |
+| `get_insights` | Overview metrics: % of AI answers that name your brand (per engine, with the change since the last run), share of voice, what changed, who's named instead, reputation, cited sources, topics |
 | `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
+| `get_reputation` | Reputation brands: answers that get your brand wrong (wrong product, outdated, contradicting your facts, engine doesn't know you), by engine, with the quote and the fact it conflicts with |
+| `draft_brand_facts` | Draft brand facts from your website for review (nothing is saved) |
+| `set_brand_facts` | Save the brand facts answers are checked against, then re-check the latest answers |
+| `check_reputation` | Re-check the latest answers against the saved brand facts |
 | `create_brand` | Create a new brand (subject to your plan's brand limit) |
 | `create_topic` | Create a topic cluster for a brand |
 | `add_prompts` | Bulk-add prompts to a brand under a topic (subject to your plan's monthly prompt limit) |
@@ -82,6 +86,8 @@ Restart Claude Desktop after saving.
 - "What should I fix to improve my AI visibility?"
 - "How does my brand compare to [competitor] in AI-generated answers?"
 - "What's the sentiment breakdown for my brand mentions?"
+- "Draft brand facts for my Reputation brand from our website, and show me what to correct"
+- "Which AI answers describe the wrong product, and where did they get it from?"
 
 ## API reference
 
@@ -119,14 +125,39 @@ Optional filters:
 ```
 GET /api/v1/brands/:id/insights
 ```
-Aggregated analytics:
+The same numbers as the Overview page:
 
-- Visibility score: percentage of prompts where your brand was mentioned
-- Sentiment: positive, neutral, and negative counts
-- Competitive share: your mentions vs. competitor mentions
-- Visibility trend: week-by-week breakdown
-- Top topics: which groups are driving the most visibility
-- Competitor breakdown: how often each competitor appears
+- `visibility`: % of answers that name your brand (1 answer = 1 prompt on 1 engine, latest run of each active prompt), with `visibilityDelta` in points and the split by engine
+- `shareOfVoice`: your mentions as a share of all mentions of you and your tracked competitors
+- `changes`: prompts where an engine stopped or started naming you, and who was named instead
+- `competitors`: you and your competitors ranked on the same metric
+- `reputation`, `sources`, `topics`, top `recommendations`
+- Legacy fields kept: sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume, competitorBreakdown
+
+### `get_reputation`
+```
+GET /api/v1/brands/:id/reputation
+```
+For Reputation brands: every answer checked against your saved brand facts. Returns `status`, problems by type and engine, `fixes` (quote, conflicting fact, prompts, engine, cited sources), a prompts × engines `matrix`, `tone` on answers with no problem, `changes`, `sources` and the saved `facts`. "No problem found" means nothing conflicts with your facts, not that the answer is verified.
+
+### `draft_brand_facts`
+```
+POST /api/v1/brands/:id/brand-facts/draft
+```
+Drafts aliases and 5 to 8 facts from your website, each with the page it came from. Nothing is saved.
+
+### `set_brand_facts`
+```
+PUT /api/v1/brands/:id/brand-facts
+{ "aliases": ["generic name"], "facts": [{ "id": "f1", "statement": "...", "kind": "identity", "source": null }] }
+```
+Replaces the facts (the version goes up by 1) and re-checks the latest answers. `kind` is one of identity, indication, regulatory, pricing, availability, other. Needs editor access. Accuracy checks run on paid plans.
+
+### `check_reputation`
+```
+POST /api/v1/brands/:id/reputation/check
+```
+Re-checks the latest answers against the current facts in the background. Read the result with `get_reputation`.
 
 ### `get_recommendations`
 ```
