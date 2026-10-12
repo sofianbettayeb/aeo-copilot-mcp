@@ -187,6 +187,58 @@ server.tool(
   }
 );
 
+// ── Tools: brand facts (Reputation brands) ───────────────────────────────────
+
+const FACT_KINDS = ["identity", "indication", "regulatory", "pricing", "availability", "other"] as const;
+
+server.tool(
+  "draft_brand_facts",
+  "Draft brand facts for a Reputation-mode brand from its own website (homepage plus up to 2 product pages). Returns `aliases` and 5-8 `facts`, each with a `kind` and the `source` page it came from. Nothing is saved: review the draft with the user, correct it, then call set_brand_facts. Drafted facts are not verified.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands (must be a Reputation-mode brand)"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/brand-facts/draft`, { method: "POST" });
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  }
+);
+
+server.tool(
+  "set_brand_facts",
+  "Save the brand facts that answers are checked against, replacing the current list (the version goes up by 1), then re-check the latest answers in the background. Only save facts the user confirmed are true today. Needs editor access to the brand.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands (must be a Reputation-mode brand)"),
+    aliases: z.array(z.string()).max(10).describe("Other names engines may use: generic name, former names, product names"),
+    facts: z
+      .array(
+        z.object({
+          id: z.string().describe("Short stable id, e.g. f1"),
+          statement: z.string().describe("1 plain sentence that is true today"),
+          kind: z.enum(FACT_KINDS),
+          source: z.string().url().nullable().optional().describe("Page the fact comes from, if any"),
+        })
+      )
+      .min(1)
+      .max(15),
+  },
+  async ({ brandId, aliases, facts }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/brand-facts`, { method: "PUT", body: { aliases, facts } });
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  }
+);
+
+server.tool(
+  "check_reputation",
+  "Re-check the latest answers of a Reputation-mode brand against its saved brand facts (answers already checked with the current facts are skipped). Runs in the background; read the result with get_reputation, where `status` is 'grading' until it's done. Needs editor access.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands (must be a Reputation-mode brand)"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/reputation/check`, { method: "POST" });
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  }
+);
+
 // ── Tool: get_recommendations ─────────────────────────────────────────────────
 
 server.tool(
