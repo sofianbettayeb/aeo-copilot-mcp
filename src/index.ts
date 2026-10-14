@@ -3,7 +3,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const BASE_URL = "https://aeo-copilot.com";
+// AEO_COPILOT_BASE_URL points the server at another instance, such as a
+// local dev server. Defaults to production.
+const BASE_URL = (process.env.AEO_COPILOT_BASE_URL || "https://aeo-copilot.com").replace(/\/$/, "");
 
 function getApiKey(): string {
   const key = process.env.AEO_COPILOT_API_KEY;
@@ -43,7 +45,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.5.0",
+  version: "1.6.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -252,6 +254,40 @@ server.tool(
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     };
+  }
+);
+
+// ── Tool: list_actions ────────────────────────────────────────────────────────
+
+server.tool(
+  "list_actions",
+  "List a Visibility-mode brand's actions: the work AEO Copilot found in its AI answers and pages, each tied to the prompts it affects. Types: cited_not_named (AI cites your page but names others), content_gap (no page answers the topic), page_structure (a fix on a specific page), source_opportunity (a site AI cites where you're not mentioned), site (site-wide). Statuses: triage (new, to decide), accepted (planned), done (before/after measured on later runs: `baseline` vs `result`, `measuredAt`), dismissed. Workflow: list triage actions, accept the ones worth doing with update_action, do the work, then mark them done. If `enabled` is false, Actions isn't switched on for this account yet; use get_recommendations instead.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    status: z
+      .enum(["triage", "accepted", "done", "dismissed"])
+      .optional()
+      .describe("Only actions in this status. Omit for all."),
+  },
+  async ({ brandId, status }) => {
+    const query = status ? `?status=${status}` : "";
+    const data = await apiFetch(`/api/v1/brands/${brandId}/actions${query}`);
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  }
+);
+
+// ── Tool: update_action ───────────────────────────────────────────────────────
+
+server.tool(
+  "update_action",
+  "Move an action: triage → accepted (saves the visibility baseline of its prompts) or dismissed; accepted → done (its result is measured on the next runs of its prompts) or back to triage; done → accepted to reopen; dismissed → triage to restore. Mark an action done only once the change is live. Needs editor access; a move that skips a step returns a 409 error.",
+  {
+    actionId: z.string().describe("The action id from list_actions"),
+    status: z.enum(["triage", "accepted", "done", "dismissed"]).describe("The status to move it to"),
+  },
+  async ({ actionId, status }) => {
+    const data = await apiFetch(`/api/v1/actions/${actionId}`, { method: "PATCH", body: { status } });
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
   }
 );
 

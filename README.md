@@ -17,6 +17,8 @@ AI search engines are eating into traditional search traffic. When someone asks 
 | `get_results` | Per-prompt results across ChatGPT, Claude, Perplexity, and Google AI Overviews: mention status, position, sentiment, sources, competitors, and the full answer text. Set `engine` to read just one LLM's answers (e.g. Claude) |
 | `get_insights` | Overview metrics: % of AI answers that name your brand (per engine, with the change since the last run), share of voice, what changed, who's named instead, reputation, cited sources, topics |
 | `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
+| `list_actions` | Your brand's actions: page fixes, pages to create, sources to win, site fixes, each tied to the prompts it affects, with before/after for done ones |
+| `update_action` | Accept, dismiss, mark done or reopen an action; done actions are measured on the next runs of their prompts |
 | `get_reputation` | Reputation brands: answers that get your brand wrong (wrong product, outdated, contradicting your facts, engine doesn't know you), by engine, with the quote and the fact it conflicts with |
 | `draft_brand_facts` | Draft brand facts from your website for review (nothing is saved) |
 | `set_brand_facts` | Save the brand facts answers are checked against, then re-check the latest answers |
@@ -84,6 +86,8 @@ Restart Claude Desktop after saving.
 - "Show me my visibility trend for the last 30 days"
 - "What topics are performing best in AI search?"
 - "What should I fix to improve my AI visibility?"
+- "Go through my new actions, accept the page fixes worth doing, and make them on our site"
+- "Which of the actions I finished last month actually got us named more often?"
 - "How does my brand compare to [competitor] in AI-generated answers?"
 - "What's the sentiment breakdown for my brand mentions?"
 - "Draft brand facts for my Reputation brand from our website, and show me what to correct"
@@ -164,6 +168,18 @@ Re-checks the latest answers against the current facts in the background. Read t
 GET /api/v1/brands/:id/recommendations
 ```
 Prioritised recommendations (high / medium / low) across visibility, content, and technical categories.
+
+### `list_actions`
+```
+GET /api/v1/brands/:id/actions?status=triage|accepted|done|dismissed
+```
+Actions for a Visibility-mode brand, high priority and most prompts first. Each has a `type` (`cited_not_named`, `content_gap`, `page_structure`, `source_opportunity`, `site`), a `target` (page URL, topic, domain or site check), what's wrong (`summary`), what to do (`detail`), `evidence`, and the `prompts` it affects. Done actions carry `baseline` (at accept) and `result` (measured on runs after the change, `measuredAt`). `enabled: false` means Actions isn't switched on for the account yet.
+
+### `update_action`
+```
+PATCH /api/v1/actions/:id   { "status": "accepted" }
+```
+Moves: triage → accepted or dismissed; accepted → done or triage; done → accepted; dismissed → triage. A skipped step returns 409. Needs editor access.
 
 ### `create_brand`
 ```
@@ -263,6 +279,12 @@ git clone https://github.com/sofianbettayeb/aeo-copilot-mcp
 cd aeo-copilot-mcp
 npm install
 AEO_COPILOT_API_KEY=aeo_your_key npm run dev
+```
+
+To run against another instance, such as a local AEO Copilot dev server, set `AEO_COPILOT_BASE_URL` (default `https://aeo-copilot.com`):
+
+```bash
+AEO_COPILOT_BASE_URL=http://localhost:3000 AEO_COPILOT_API_KEY=aeo_your_key npm run dev
 ```
 
 ## License
