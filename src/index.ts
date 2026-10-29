@@ -82,7 +82,7 @@ server.tool(
 
 server.tool(
   "get_results",
-  "Get prompt execution results for a brand across AI engines (ChatGPT, Claude, Perplexity, Google AI Overviews). Each result includes a per-engine block with the full answer text (`response`), plus whether your brand was mentioned, its position, sentiment, sources, and which competitors appeared. Set `engine` to return only one engine's answers — e.g. 'claude' to read exactly what Claude said.",
+  "Get prompt execution results for a brand across AI engines. Each account tracks up to 4 of 5 engines: ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews (simulated). Each result includes a per-engine block for every engine that ran with the full answer text (`response`), plus whether your brand was mentioned, its position, sentiment, sources, and which competitors appeared. Set `engine` to return only one engine's answers — e.g. 'claude' to read exactly what Claude said.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     topicId: z
@@ -90,10 +90,10 @@ server.tool(
       .optional()
       .describe("Filter results to a specific topic UUID"),
     engine: z
-      .enum(["chatgpt", "claude", "perplexity", "googleAio"])
+      .enum(["chatgpt", "claude", "perplexity", "googleAio", "gemini"])
       .optional()
       .describe(
-        "Return only this engine's answer/response for each prompt (e.g. 'claude'). Omit to get every engine's block."
+        "Return only this engine's answer/response for each prompt (e.g. 'claude' or 'gemini'). Prompts where that engine did not run are left out. Omit to get every engine's block."
       ),
     from: z
       .string()
@@ -123,8 +123,8 @@ server.tool(
       `/api/v1/brands/${brandId}/results${query}`
     )) as { data?: unknown[]; total?: number };
 
-    // The API has no server-side engine filter — it always returns all four
-    // engine blocks. When the caller asks for one engine, flatten each result
+    // The API has no server-side engine filter — it always returns a block
+    // per engine (null when that engine didn't run). When the caller asks for one engine, flatten each result
     // to that engine's answer so the payload is focused (and much smaller).
     let payload: unknown = data;
     if (engine && Array.isArray(data?.data)) {
@@ -161,7 +161,7 @@ server.tool(
 
 server.tool(
   "get_insights",
-  "Get the overview metrics for a brand, the same numbers the Overview page shows. `visibility` is the % of answers that name the brand (1 answer = 1 prompt on 1 engine, latest result per active prompt), `visibilityDelta` the change in points against each prompt's previous result, `engines` the split by ChatGPT, Claude, Perplexity and Google AI Overview, `shareOfVoice` the brand's mentions as a share of all mentions of the brand and its tracked competitors. Also returns `run` (Baseline or Pulse, last and next run), `changes` (prompts where engines stopped or started naming the brand, and who was named instead), `competitors` (brand and competitors ranked on the same metric), `gap` (answers naming a competitor but not the brand), `reputation` (sentiment on answers that name the brand, with an excerpt), `sources` (cited domains), `topics`, top `recommendations`, plus the legacy fields sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume and competitorBreakdown.",
+  "Get the overview metrics for a brand, the same numbers the Overview page shows. `visibility` is the % of answers that name the brand (1 answer = 1 prompt on 1 engine, latest result per active prompt), `visibilityDelta` the change in points against each prompt's previous result, `engines` the split by ChatGPT, Claude, Perplexity, Google AI Overview and Gemini, `shareOfVoice` the brand's mentions as a share of all mentions of the brand and its tracked competitors. Also returns `run` (Baseline or Pulse, last and next run), `changes` (prompts where engines stopped or started naming the brand, and who was named instead), `competitors` (brand and competitors ranked on the same metric), `gap` (answers naming a competitor but not the brand), `reputation` (sentiment on answers that name the brand, with an excerpt), `sources` (cited domains), `topics`, top `recommendations`, plus the legacy fields sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume and competitorBreakdown.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
   },
@@ -393,7 +393,7 @@ const promptEditFields = {
   llm: z
     .string()
     .optional()
-    .describe("LLM engine label (one of: ChatGPT, Claude, Perplexity, Google AIO)"),
+    .describe("LLM engine label (one of: ChatGPT, Claude, Perplexity, Google AIO, Gemini)"),
   topicId: z
     .string()
     .nullable()
@@ -543,7 +543,7 @@ server.tool(
 
 server.tool(
   "run_brand_prompts",
-  "Run all prompts for a brand across every enabled LLM (ChatGPT, Claude, Perplexity, Google AI Overviews). Optionally filter to a single topic. Returns the count of prompts run.",
+  "Run all prompts for a brand on the engines the account has selected (up to 4 of ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews). Optionally filter to a single topic. Returns the count of prompts run.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     topicId: z
@@ -675,7 +675,7 @@ server.tool(
 
 server.tool(
   "run_index_prompts",
-  "Run all prompts in an index across all 4 LLMs (ChatGPT, Claude, Perplexity, Google AI Overviews) and store full per-LLM results. No brand filter — every entity mentioned is captured.",
+  "Run all prompts in an index on the engines the account has selected (up to 4 of ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews) and store full per-LLM results. No brand filter — every entity mentioned is captured.",
   {
     indexId: z.string().describe("The index UUID from list_indexes"),
   },
@@ -693,7 +693,7 @@ server.tool(
 
 server.tool(
   "get_index_results",
-  "Get raw per-prompt results for an industry index across all 4 LLMs. Same shape as get_results minus the brand-mention fields — every cited entity is captured.",
+  "Get raw per-prompt results for an industry index, with a block per engine that ran. Same shape as get_results minus the brand-mention fields — every cited entity is captured.",
   {
     indexId: z.string().describe("The index UUID from list_indexes"),
   },

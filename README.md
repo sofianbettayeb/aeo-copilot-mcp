@@ -6,7 +6,7 @@ Connect [AEO Copilot](https://aeo-copilot.com) to Claude or any MCP-compatible a
 
 AI search engines are eating into traditional search traffic. When someone asks ChatGPT "What's the best tool for X?", your brand either shows up or it doesn't — and unlike Google, there's no ranking page to check.
 
-[AEO Copilot](https://aeo-copilot.com) runs prompts against ChatGPT, Claude, Perplexity, and Google AI Overviews and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
+[AEO Copilot](https://aeo-copilot.com) runs prompts against 4 engines of your choice out of ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews, and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
 
 ## Tools
 
@@ -14,7 +14,7 @@ AI search engines are eating into traditional search traffic. When someone asks 
 |------|-------------|
 | `list_brands` | List all brands on your account |
 | `list_topics` | List topics for a brand (e.g. "Product Comparisons", "Pricing Questions") |
-| `get_results` | Per-prompt results across ChatGPT, Claude, Perplexity, and Google AI Overviews: mention status, position, sentiment, sources, competitors, and the full answer text. Set `engine` to read just one LLM's answers (e.g. Claude) |
+| `get_results` | Per-prompt results for each engine the account tracks (ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews): mention status, position, sentiment, sources, competitors, and the full answer text. Set `engine` to read just one LLM's answers (e.g. Claude) |
 | `get_insights` | Overview metrics: % of AI answers that name your brand (per engine, with the change since the last run), share of voice, what changed, who's named instead, reputation, cited sources, topics |
 | `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
 | `list_actions` | Your brand's actions: page fixes, pages to create, sources to win, site fixes, each tied to the prompts it affects, with before/after for done ones |
@@ -32,7 +32,7 @@ AI search engines are eating into traditional search traffic. When someone asks 
 | `list_indexes` | List all industry indexes on your account |
 | `add_index_topic` | Add a topic cluster to an index |
 | `add_index_prompts` | Bulk-add prompts to a topic in an index |
-| `run_index_prompts` | Run all index prompts across all 4 LLMs and store full per-LLM results |
+| `run_index_prompts` | Run all index prompts on the account's selected engines and store full per-LLM results |
 | `get_index_results` | Raw per-prompt results for an index across all LLMs |
 | `get_index_share_of_voice` | Ranked entity list by citation frequency + concentration score (top-1 share, HHI) |
 | `get_index_sources` | Domains ranked by citation frequency across every LLM response |
@@ -118,12 +118,12 @@ Optional filters:
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `topicId` | string | Filter by topic |
-| `engine` | string | Return only one engine's answers: `chatgpt`, `claude`, `perplexity`, or `googleAio`. Each result is flattened to that engine's block (including its `response` text) and prompts where it wasn't run are omitted. Omit to get every engine |
+| `engine` | string | Return only one engine's answers: `chatgpt`, `claude`, `perplexity`, `googleAio`, or `gemini`. Each result is flattened to that engine's block (including its `response` text) and prompts where it wasn't run are omitted. Omit to get every engine |
 | `from` | ISO date | Start date, e.g. `2025-01-01` |
 | `to` | ISO date | End date |
 | `limit` | number | Max results (default 100, max 500) |
 
-> The API has no server-side `engine` filter — it always returns all four engine blocks. The MCP server applies the `engine` filter client-side so you get a focused, smaller payload when you only want one LLM (e.g. exactly what Claude said).
+> The API has no server-side `engine` filter — it always returns a block per engine (null when that engine didn't run). The MCP server applies the `engine` filter client-side so you get a focused, smaller payload when you only want one LLM (e.g. exactly what Claude said).
 
 ### `get_insights`
 ```
@@ -243,7 +243,7 @@ Bulk-add prompts under a topic. Body: `topicId` (required), `prompts[]` (require
 ```
 POST /api/v1/indexes/:id/run
 ```
-Run every prompt across all 4 LLMs (ChatGPT, Claude, Perplexity, Google AI Overviews). All extracted entities are stored as competitors — no brand filter.
+Run every prompt on the engines the account has selected (up to 4 of ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews). All extracted entities are stored as competitors — no brand filter.
 
 ### `get_index_results`
 ```
