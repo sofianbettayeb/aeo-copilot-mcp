@@ -8,6 +8,16 @@ AI search engines are eating into traditional search traffic. When someone asks 
 
 [AEO Copilot](https://aeo-copilot.com) runs prompts against 4 engines of your choice out of ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews, and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
 
+## New in 2.1.0
+
+Your agent can now read and act on Site audit > Content, to improve the pages your prompts point to.
+
+- `get_content_audit`: every audited page with its quality, substance, trust and copy scores, and the average over time.
+- `get_content_audit_page`: one page's full report (failed checks, copy tells, fixes), its score history, the prompts that point to it and its open actions.
+- `set_content_audit_pages` and `run_content_audit`: choose which pages are audited, and rescore them after you edit.
+
+These need the new version of AEO Copilot on the brand.
+
 ## New in 2.0.0
 
 Recommendations are now Actions, in the app and here.
@@ -36,6 +46,10 @@ On 1.x, `get_recommendations` returns a 404. `npx aeo-copilot-mcp` picks up 2.0.
 | `add_prompts` | Bulk-add prompts to a brand under a topic (subject to your plan's monthly prompt limit) |
 | `run_brand_prompts` | Run all prompts for a brand (or one topic) across every enabled LLM |
 | `scan_brand` | Run the technical audit on the brand's website and return the full scan result |
+| `get_content_audit` | Site audit > Content: each audited page's quality, substance, trust and copy scores, the last change, prompts pointing to it, and the average over time |
+| `get_content_audit_page` | One page's content report (failed checks, copy tells, fixes), score history, matched prompts and open actions, to improve that page |
+| `set_content_audit_pages` | Replace the pages added to the content audit (up to 20); new pages are scored right away |
+| `run_content_audit` | Rescore the content audit pages now, for example after editing a page |
 | `create_index` | Create an industry index (brand-agnostic — every cited entity is captured) |
 | `list_indexes` | List all industry indexes on your account |
 | `add_index_topic` | Add a topic cluster to an index |
@@ -94,6 +108,7 @@ Restart Claude Desktop after saving.
 - "Show me my visibility trend for the last 30 days"
 - "What topics are performing best in AI search?"
 - "What should I fix to improve my AI visibility?"
+- "Find my lowest-scoring page in the content audit, fix its copy on our site, then rescore it"
 - "Go through my new actions, accept the page fixes worth doing, and make them on our site"
 - "Which of the actions I finished last month actually got us named more often?"
 - "How does my brand compare to [competitor] in AI-generated answers?"
@@ -213,6 +228,30 @@ Run all prompts across every enabled LLM. Optional query param `topicId` to scop
 POST /api/v1/brands/:id/scan
 ```
 Run the technical audit on the brand's website. Returns the full scan result (schema markup, sitemap, llms.txt, etc.) — same data the dashboard's technical scan view shows.
+
+### `get_content_audit`
+```
+GET /api/v1/brands/:id/content-audit
+```
+Audited pages with their scores (`quality`, `substance`, `trust`, `copy`, 0-100), the pages added by URL list (`addedUrls`), the average quality and its history by day. `processing` is true while pages are being scored. `enabled: false` when the brand is not on the new version.
+
+### `get_content_audit_page`
+```
+GET /api/v1/brands/:id/content-audit/page?url=
+```
+One page: `page` (scores), `report` (the slop detector's copy and quality reports), `history`, `prompts` pointing to the page, and `actions` about it. 404 when the page hasn't been scored.
+
+### `set_content_audit_pages`
+```
+PUT /api/v1/brands/:id/content-audit/pages   { "urls": [...] }
+```
+Replaces the added pages (up to 20, on the brand's site). Returns `saved` and `refused` with the reason. Editor access.
+
+### `run_content_audit`
+```
+POST /api/v1/brands/:id/content-audit/run
+```
+Rescores the content audit pages in the background (202). Editor access.
 
 ## Industry indexes
 
