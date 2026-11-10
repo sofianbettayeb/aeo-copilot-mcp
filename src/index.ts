@@ -45,7 +45,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "1.6.0",
+  version: "2.0.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ server.tool(
 
 server.tool(
   "get_insights",
-  "Get the overview metrics for a brand, the same numbers the Overview page shows. `visibility` is the % of answers that name the brand (1 answer = 1 prompt on 1 engine, latest result per active prompt), `visibilityDelta` the change in points against each prompt's previous result, `engines` the split by ChatGPT, Claude, Perplexity, Google AI Overview and Gemini, `shareOfVoice` the brand's mentions as a share of all mentions of the brand and its tracked competitors. Also returns `run` (Baseline or Pulse, last and next run), `changes` (prompts where engines stopped or started naming the brand, and who was named instead), `competitors` (brand and competitors ranked on the same metric), `gap` (answers naming a competitor but not the brand), `reputation` (sentiment on answers that name the brand, with an excerpt), `sources` (cited domains), `topics`, top `recommendations`, plus the legacy fields sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume and competitorBreakdown.",
+  "Get the overview metrics for a brand, the same numbers the Overview page shows. `visibility` is the % of answers that name the brand (1 answer = 1 prompt on 1 engine, latest result per active prompt), `visibilityDelta` the change in points against each prompt's previous result, `engines` the split by ChatGPT, Claude, Perplexity, Google AI Overview and Gemini, `shareOfVoice` the brand's mentions as a share of all mentions of the brand and its tracked competitors. Also returns `run` (Baseline or Pulse, last and next run), `changes` (prompts where engines stopped or started naming the brand, and who was named instead), `competitors` (brand and competitors ranked on the same metric), `gap` (answers naming a competitor but not the brand), `reputation` (sentiment on answers that name the brand, with an excerpt), `sources` (cited domains), `topics`, `recommendations` (the brand's 3 most urgent open actions, each with id, priority, category, type, title, description and target; list_actions has them all), plus the legacy fields sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume and competitorBreakdown.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
   },
@@ -238,22 +238,6 @@ server.tool(
   async ({ brandId }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/reputation/check`, { method: "POST" });
     return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-  }
-);
-
-// ── Tool: get_recommendations ─────────────────────────────────────────────────
-
-server.tool(
-  "get_recommendations",
-  "Get prioritised, actionable recommendations to improve your brand's AI visibility — based on prompt results and a technical audit of your website.",
-  {
-    brandId: z.string().describe("The brand UUID from list_brands"),
-  },
-  async ({ brandId }) => {
-    const data = await apiFetch(`/api/v1/brands/${brandId}/recommendations`);
-    return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-    };
   }
 );
 
