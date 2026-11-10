@@ -16,7 +16,6 @@ AI search engines are eating into traditional search traffic. When someone asks 
 | `list_topics` | List topics for a brand (e.g. "Product Comparisons", "Pricing Questions") |
 | `get_results` | Per-prompt results for each engine the account tracks (ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews): mention status, position, sentiment, sources, competitors, and the full answer text. Set `engine` to read just one LLM's answers (e.g. Claude) |
 | `get_insights` | Overview metrics: % of AI answers that name your brand (per engine, with the change since the last run), share of voice, what changed, who's named instead, reputation, cited sources, topics |
-| `get_recommendations` | Prioritised action items based on prompt results and a technical audit of your site |
 | `list_actions` | Your brand's actions: page fixes, pages to create, sources to win, site fixes, each tied to the prompts it affects, with before/after for done ones |
 | `update_action` | Accept, dismiss, mark done or reopen an action; done actions are measured on the next runs of their prompts |
 | `get_reputation` | Reputation brands: answers that get your brand wrong (wrong product, outdated, contradicting your facts, engine doesn't know you), by engine, with the quote and the fact it conflicts with |
@@ -135,7 +134,8 @@ The same numbers as the Overview page:
 - `shareOfVoice`: your mentions as a share of all mentions of you and your tracked competitors
 - `changes`: prompts where an engine stopped or started naming you, and who was named instead
 - `competitors`: you and your competitors ranked on the same metric
-- `reputation`, `sources`, `topics`, top `recommendations`
+- `reputation`, `sources`, `topics`
+- `recommendations`: your 3 most urgent open actions (id, priority, category, type, title, description, target). `list_actions` returns them all
 - Legacy fields kept: sentiment, competitiveShare, visibilityTrend, topTopics, mentionVolume, competitorBreakdown
 
 ### `get_reputation`
@@ -162,12 +162,6 @@ Replaces the facts (the version goes up by 1) and re-checks the latest answers. 
 POST /api/v1/brands/:id/reputation/check
 ```
 Re-checks the latest answers against the current facts in the background. Read the result with `get_reputation`.
-
-### `get_recommendations`
-```
-GET /api/v1/brands/:id/recommendations
-```
-Prioritised recommendations (high / medium / low) across visibility, content, and technical categories.
 
 ### `list_actions`
 ```
