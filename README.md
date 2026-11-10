@@ -1,12 +1,21 @@
 # AEO Copilot MCP Server
 
-Connect [AEO Copilot](https://aeo-copilot.com) to Claude or any MCP-compatible assistant. Ask your AI about your brand's visibility in ChatGPT, Claude, Perplexity, and Google AI Overviews without switching tabs.
+Connect [AEO Copilot](https://aeo-copilot.com) to Claude or any MCP-compatible assistant. Ask your AI how ChatGPT, Claude, Perplexity, Gemini and Google AI Overviews answer about your brand, then work through the fixes AEO Copilot finds (Actions) without switching tabs.
 
 ## What is AEO Copilot?
 
-AI search engines are eating into traditional search traffic. When someone asks ChatGPT "What's the best tool for X?", your brand either shows up or it doesn't — and unlike Google, there's no ranking page to check.
+AI search engines are eating into traditional search traffic. When someone asks ChatGPT "What's the best tool for X?", your brand either shows up or it doesn't. Unlike Google, there's no ranking page to check.
 
 [AEO Copilot](https://aeo-copilot.com) runs prompts against 4 engines of your choice out of ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews, and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
+
+## New in 2.0.0
+
+Recommendations are now Actions, in the app and here.
+
+- `get_recommendations` is removed, along with `GET /api/v1/brands/:id/recommendations`. Use `list_actions` to read what to fix and `update_action` to accept, dismiss or mark it done.
+- `get_insights` keeps its `recommendations` field. It now holds your 3 most urgent open actions.
+
+On 1.x, `get_recommendations` returns a 404. `npx aeo-copilot-mcp` picks up 2.0.0 on its own; if you pinned a version, move to `aeo-copilot-mcp@2`.
 
 ## Tools
 
@@ -167,7 +176,7 @@ Re-checks the latest answers against the current facts in the background. Read t
 ```
 GET /api/v1/brands/:id/actions?status=triage|accepted|done|dismissed
 ```
-Actions for a Visibility-mode brand, high priority and most prompts first. Each has a `type` (`cited_not_named`, `content_gap`, `page_structure`, `source_opportunity`, `site`), a `target` (page URL, topic, domain or site check), what's wrong (`summary`), what to do (`detail`), `evidence`, and the `prompts` it affects. Done actions carry `baseline` (at accept) and `result` (measured on runs after the change, `measuredAt`). `enabled: false` means Actions isn't switched on for the account yet.
+Actions for a Visibility-mode brand, high priority and most prompts first. Each has a `type` (`cited_not_named`, `content_gap`, `page_structure`, `content_quality`, `source_opportunity`, `site`), a `target` (page URL, topic, domain or site check), what's wrong (`summary`), what to do (`detail`), `evidence`, and the `prompts` it affects. Done actions carry `baseline` (at accept) and `result` (measured on runs after the change, `measuredAt`). `enabled: false` means Actions isn't switched on for the account yet.
 
 ### `update_action`
 ```
