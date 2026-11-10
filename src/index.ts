@@ -45,7 +45,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "2.0.0",
+  version: "2.1.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -790,6 +790,77 @@ server.tool(
   },
   async ({ brandId }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/audit/result`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_content_audit ───────────────────────────────────────────────────
+
+server.tool(
+  "get_content_audit",
+  "Get Site audit > Content for a brand: every audited page with its content scores (quality, substance, trust, copy, all 0-100, higher is better), the last score change, how many prompts point to it, plus the average quality over time and the pages added by URL list. Scores come from the AI slop detector. Use get_content_audit_page for one page's findings. Answers { enabled: false } when the brand is not on the new version.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/content-audit`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: get_content_audit_page ──────────────────────────────────────────────
+
+server.tool(
+  "get_content_audit_page",
+  "Get everything AEO Copilot knows about one audited page, to improve it: its content scores and history, the full slop-detector report (failed checks, copy tells and suggested fixes), the active prompts that point to the page, and the open actions about it. Fetch the live page yourself for its current copy. Returns a 404 error if the page hasn't been scored; get_content_audit lists the scored pages.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    url: z.string().describe("The page URL, as listed by get_content_audit (any spelling of the URL works)"),
+  },
+  async ({ brandId, url }) => {
+    const data = await apiFetch(
+      `/api/v1/brands/${brandId}/content-audit/page?url=${encodeURIComponent(url)}`
+    );
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: set_content_audit_pages ─────────────────────────────────────────────
+
+server.tool(
+  "set_content_audit_pages",
+  "Replace the list of pages added to the brand's content audit (up to 20, on the brand's own site). Pages that prompts point to are scored anyway. New pages are scored right away; pages that can't be audited come back under refused. Pass an empty list to remove all added pages. Needs editor access.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    urls: z.array(z.string()).max(20).describe("The full list of pages to add (replaces the previous list)"),
+  },
+  async ({ brandId, urls }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/content-audit/pages`, {
+      method: "PUT",
+      body: { urls },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── Tool: run_content_audit ───────────────────────────────────────────────────
+
+server.tool(
+  "run_content_audit",
+  "Rescore the brand's content audit pages now, for example after you changed a page. Runs in the background: call get_content_audit or get_content_audit_page after a few minutes. Pages whose copy hasn't changed keep their last report. Needs editor access.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => {
+    const data = await apiFetch(`/api/v1/brands/${brandId}/content-audit/run`, { method: "POST" });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     };
