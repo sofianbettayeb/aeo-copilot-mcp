@@ -7,13 +7,23 @@ import { z } from "zod";
 // local dev server. Defaults to production.
 const BASE_URL = (process.env.AEO_COPILOT_BASE_URL || "https://aeo-copilot.com").replace(/\/$/, "");
 
+const KEY_HELP =
+  "Create one at https://aeo-copilot.com/settings/api (Settings → API → Create API key). " +
+  "API keys need a paid plan. In Claude Code, swap the key with: " +
+  "claude mcp remove aeo-copilot -s user, then claude mcp add aeo-copilot -s user -e AEO_COPILOT_API_KEY=<your key> -- npx -y aeo-copilot-mcp";
+
+// Placeholders copied from the README or the setup guide, left in by mistake.
+function isPlaceholderKey(key: string): boolean {
+  return /^(aeo_)?(your|my)_?(api_?)?key(_here)?$|^<.*>$/i.test(key.trim());
+}
+
 function getApiKey(): string {
   const key = process.env.AEO_COPILOT_API_KEY;
   if (!key) {
-    throw new Error(
-      "AEO_COPILOT_API_KEY environment variable is not set. " +
-        "Create one at https://aeo-copilot.com/settings (Settings → API → Create API key)."
-    );
+    throw new Error(`AEO_COPILOT_API_KEY environment variable is not set. ${KEY_HELP}`);
+  }
+  if (isPlaceholderKey(key)) {
+    throw new Error(`AEO_COPILOT_API_KEY is still the placeholder "${key}", not a real key. ${KEY_HELP}`);
   }
   return key;
 }
@@ -37,6 +47,9 @@ async function apiFetch(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    if (res.status === 401) {
+      throw new Error(`AEO Copilot API error 401: ${body}. The API key is invalid or was revoked. ${KEY_HELP}`);
+    }
     throw new Error(`AEO Copilot API error ${res.status}: ${body}`);
   }
 
@@ -45,7 +58,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "2.1.0",
+  version: "2.1.1",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
