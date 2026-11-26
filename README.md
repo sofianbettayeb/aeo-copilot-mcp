@@ -209,7 +209,7 @@ Create a new brand. Body: `name` (required), `website`, `industry`, `products[]`
 ```
 POST /api/v1/brands/:id/topics
 ```
-Create a topic cluster. Body: `name` (required), `description`, `pages[]`, `keywords[]`.
+Create a topic cluster. Body: `name` (required), `description`, `pages[]`, `keywords[]`, `searchLocation` (`{ country, region?, city? }`, country as an ISO 3166-1 alpha-2 code such as `IN`). Every prompt in the topic runs from that location.
 
 ### `add_prompts`
 ```

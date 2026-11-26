@@ -58,7 +58,7 @@ async function apiFetch(
 
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "2.1.1",
+  version: "2.1.2",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -258,7 +258,7 @@ server.tool(
 
 server.tool(
   "list_actions",
-  "List a Visibility-mode brand's actions: the work AEO Copilot found in its AI answers and pages, each tied to the prompts it affects. Types: cited_not_named (AI cites your page but names others), content_gap (no page answers the topic), page_structure (a fix on a specific page), source_opportunity (a site AI cites where you're not mentioned), site (site-wide). Statuses: triage (new, to decide), accepted (planned), done (before/after measured on later runs: `baseline` vs `result`, `measuredAt`), dismissed. Workflow: list triage actions, accept the ones worth doing with update_action, do the work, then mark them done. If `enabled` is false, Actions isn't switched on for this account yet; use get_recommendations instead.",
+  "List a Visibility-mode brand's actions: the work AEO Copilot found in its AI answers and pages, each tied to the prompts it affects. Types: cited_not_named (AI cites your page but names others), content_gap (no page answers the topic), page_structure (a fix on a specific page), source_opportunity (a site AI cites where you're not mentioned), site (site-wide). Statuses: triage (new, to decide), accepted (planned), done (before/after measured on later runs: `baseline` vs `result`, `measuredAt`), dismissed. Workflow: list triage actions, accept the ones worth doing with update_action, do the work, then mark them done. If `enabled` is false, Actions isn't switched on for this account yet, so there are no actions to list. Actions can also be `expired` (set by the system, never moved by hand); they appear only when listing without a status filter.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     status: z
@@ -325,7 +325,7 @@ server.tool(
 
 server.tool(
   "create_topic",
-  "Create a topic cluster for a brand. Topics group related prompts (e.g. 'Pricing Questions', 'Product Comparisons').",
+  "Create a topic cluster for a brand. Topics group related prompts (e.g. 'Pricing Questions', 'Product Comparisons'). Optionally set a search location (country, region, city) that all the topic's prompts run from.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     name: z.string().min(1).describe("Topic name"),
@@ -341,11 +341,24 @@ server.tool(
       .array(z.string())
       .optional()
       .describe("Keywords associated with this topic"),
+    searchLocation: z
+      .object({
+        country: z
+          .string()
+          .length(2)
+          .describe("ISO 3166-1 alpha-2 country code, e.g. IN, US, GB"),
+        region: z.string().optional().describe("State, province or other subdivision, e.g. Maharashtra"),
+        city: z.string().optional().describe("City, e.g. Mumbai"),
+      })
+      .optional()
+      .describe(
+        "Where this topic's prompts are searched from. Every prompt in the topic runs from this place, so keep the location out of the prompt text. Omit for the engines' defaults."
+      ),
   },
-  async ({ brandId, name, description, pages, keywords }) => {
+  async ({ brandId, name, description, pages, keywords, searchLocation }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/topics`, {
       method: "POST",
-      body: { name, description, pages, keywords },
+      body: { name, description, pages, keywords, searchLocation },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
