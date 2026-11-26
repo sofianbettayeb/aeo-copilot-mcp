@@ -8,6 +8,16 @@ AI search engines are eating into traditional search traffic. When someone asks 
 
 [AEO Copilot](https://aeo-copilot.com) runs prompts against 4 engines of your choice out of ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews, and records whether your brand got mentioned, where it ranked, how it was described, and which competitors showed up instead. This MCP server puts that data inside your AI assistant.
 
+## New in 2.2.0
+
+Your agent can now manage the settings behind a run and read your connected data, without opening the dashboard.
+
+- **Topics:** `create_topic` takes a `searchLocation` (country, region, city), so every prompt in the topic runs from that place. `update_topic` renames a topic or changes its description, pages, keywords or location; `delete_topic` removes it and keeps its prompts.
+- **Settings:** `get_engine_settings` and `update_engine_settings` choose the engines and the live web search default for the account. `get_brand_settings` and `update_brand_settings` set a brand's run schedule and live web search, and show how precisely each engine uses a topic's location.
+- **Runs:** `get_run_status` tells you whether a run's answers have all arrived, prompt by prompt.
+- **Technical scan:** `get_scan_result` reads the last scan without running a new one.
+- **Data sources (paid plans):** `list_integrations`, `get_ai_arrivals` (visits from AI engines, from Google Analytics or PostHog), `get_crawler_traffic` (AI crawlers, from Cloudflare) and `get_search_queries` (Search Console and Bing queries, for the site or one page).
+
 ## New in 2.1.0
 
 Your agent can now read and act on Site audit > Content, to improve the pages your prompts point to.
@@ -42,10 +52,28 @@ On 1.x, `get_recommendations` returns a 404. `npx aeo-copilot-mcp` picks up 2.0.
 | `set_brand_facts` | Save the brand facts answers are checked against, then re-check the latest answers |
 | `check_reputation` | Re-check the latest answers against the saved brand facts |
 | `create_brand` | Create a new brand (subject to your plan's brand limit) |
-| `create_topic` | Create a topic cluster for a brand |
+| `create_topic` | Create a topic cluster for a brand, optionally with a search location (country, region, city) its prompts run from |
+| `update_topic` | Rename a topic, change its description, pages or keywords, or set, change or clear its search location |
+| `delete_topic` | Delete a topic; its prompts and results are kept, ungrouped |
 | `add_prompts` | Bulk-add prompts to a brand under a topic (subject to your plan's monthly prompt limit) |
+| `list_prompts` | Every prompt of a brand with its id, topic, target page, last run and paused state, including prompts never run |
+| `update_prompt` | Edit one prompt's text, topic or target page; past results stay linked |
+| `update_prompts` | Edit up to 50 prompts in one call |
+| `delete_prompts` | Delete prompts; restorable for 48 hours |
+| `list_deleted_prompts` | Recently deleted prompts that can still be restored |
+| `restore_prompts` | Undo a deletion |
 | `run_brand_prompts` | Run all prompts for a brand (or one topic) across every enabled LLM |
+| `get_run_status` | Whether the latest answers have all arrived: per prompt, the engines that answered, are still pending or failed, plus the scheduled run |
 | `scan_brand` | Run the technical audit on the brand's website and return the full scan result |
+| `get_scan_result` | Read the last technical scan without running a new one |
+| `get_engine_settings` | The account's engines, what the plan allows, and the live web search default |
+| `update_engine_settings` | Choose the engines runs use and the live web search default |
+| `get_brand_settings` | A brand's schedule, live web search, data source, and how precisely each engine uses a topic's location |
+| `update_brand_settings` | Change a brand's schedule (weekly, bimonthly, monthly, on or off) and its live web search |
+| `list_integrations` | The brand's data sources (Search Console, Bing, Google Analytics, PostHog, Cloudflare) and whether each is connected |
+| `get_ai_arrivals` | Visits from AI engines over 90 days, by referrer and page, or for one page (Google Analytics or PostHog) |
+| `get_crawler_traffic` | AI crawler visits from Cloudflare: bots by purpose, pages crawled, errors, verified vs spoofed |
+| `get_search_queries` | Google and Bing search queries for the site or one page, marked when a prompt already tracks them |
 | `get_content_audit` | Site audit > Content: each audited page's quality, substance, trust and copy scores, the last change, prompts pointing to it, and the average over time |
 | `get_content_audit_page` | One page's content report (failed checks, copy tells, fixes), score history, matched prompts and open actions, to improve that page |
 | `set_content_audit_pages` | Replace the pages added to the content audit (up to 20); new pages are scored right away |
@@ -115,6 +143,10 @@ Restart Claude Desktop after saving.
 - "What's the sentiment breakdown for my brand mentions?"
 - "Draft brand facts for my Reputation brand from our website, and show me what to correct"
 - "Which AI answers describe the wrong product, and where did they get it from?"
+- "Add a topic searched from India with these 5 prompts, run it, and tell me when every answer is in"
+- "Turn on live web search and weekly runs for this brand"
+- "Which pages get the most visits from ChatGPT, and which questions do they rank for on Google?"
+- "Which AI crawlers fetch our site, and which of our pages do they never reach?"
 
 ## API reference
 
@@ -211,23 +243,110 @@ POST /api/v1/brands/:id/topics
 ```
 Create a topic cluster. Body: `name` (required), `description`, `pages[]`, `keywords[]`, `searchLocation` (`{ country, region?, city? }`, country as an ISO 3166-1 alpha-2 code such as `IN`). Every prompt in the topic runs from that location.
 
+### `update_topic`
+```
+PATCH /api/v1/topics/:id
+```
+Change a topic. Body: any of `name`, `description` (null clears it), `pages[]`, `keywords[]`, `searchLocation` (`{ country, region?, city? }`, or null to clear it). `pages` and `keywords` replace the saved list. Editor access.
+
+### `delete_topic`
+```
+DELETE /api/v1/topics/:id
+```
+Delete a topic. Its prompts and their results are kept, ungrouped. Returns `{ id, deleted, promptsUngrouped }`. Editor access.
+
 ### `add_prompts`
 ```
 POST /api/v1/brands/:id/prompts
 ```
 Bulk-add prompts under a topic. Body: `topicId` (required), `prompts[]` (required, array of strings). Returns 402 if adding these prompts would exceed your plan's monthly prompt limit.
 
+### `list_prompts`
+```
+GET /api/v1/brands/:id/prompts
+```
+Every prompt of the brand with its id, text, topic, target page, last run and paused state. Optional query param `topicId`.
+
+### `update_prompt` / `update_prompts`
+```
+PATCH /api/v1/prompts/:id
+PATCH /api/v1/prompts
+```
+Edit a prompt's `text`, `topicId` or `recommendationPageUrl`; the bulk form takes `updates[]` (up to 50, each with its `id`). Past results stay linked.
+
+### `delete_prompts` / `list_deleted_prompts` / `restore_prompts`
+```
+POST /api/v1/prompts/bulk-delete
+GET  /api/v1/prompts/deleted?brandId=
+POST /api/v1/prompts/bulk-restore
+```
+Deleted prompts can be restored for 48 hours, by delete batch.
+
 ### `run_brand_prompts`
 ```
 POST /api/v1/brands/:id/run
 ```
-Run all prompts across every enabled LLM. Optional query param `topicId` to scope to a single topic. Returns the count of prompts run.
+Run all prompts across every enabled LLM. Optional query param `topicId` to scope to a single topic. Returns the count of prompts run once the live engines answered.
+
+### `get_run_status`
+```
+GET /api/v1/brands/:id/run-status
+```
+Whether the latest answers have all arrived. Some land after a run returns: BYOK tasks still running, or a scheduled Claude batch. Optional query param `topicId`. Returns `complete`, `pendingAnswers`, `neverRun`, `scheduledRun` (`inProgress`, `lastRunAt`, `nextRunAt`) and, per active prompt, `lastRunAt`, `answered[]`, `pending[]` and `failed[]` (engine and reason).
 
 ### `scan_brand`
 ```
 POST /api/v1/brands/:id/scan
 ```
 Run the technical audit on the brand's website. Returns the full scan result (schema markup, sitemap, llms.txt, etc.) — same data the dashboard's technical scan view shows.
+
+### `get_scan_result`
+```
+GET /api/v1/brands/:id/scan
+```
+The last technical scan, without running a new one. Returns 404 `NO_SCAN` when the brand was never scanned.
+
+### `get_engine_settings` / `update_engine_settings`
+```
+GET   /api/v1/settings/engines
+PATCH /api/v1/settings/engines
+```
+The account's engines and live web search default, used by every brand the account owns. Returns `enabledEngines`, `allowedEngines`, `planLockedEngines`, `maxSelectedEngines`, `liveWebSearch`, `planAllowsLiveWebSearch`. Body for PATCH: `enabledEngines[]` (from `chatgpt`, `claude`, `perplexity`, `googleaio`, `gemini`; at least 1) and/or `liveWebSearch` (paid plans).
+
+### `get_brand_settings` / `update_brand_settings`
+```
+GET   /api/v1/brands/:id/settings
+PATCH /api/v1/brands/:id/settings
+```
+A brand's `schedule` (`frequency`, `isEnabled`, `lastRunAt`, `nextRunAt`), `liveWebSearch` (`brand` override, `account` default, `effective`), `dataSource` (`managed`, `openrouter` or `querying`) and `locationSupport`: per engine, how precisely it runs from a topic's location (`city`, `country`, `hint` or `none`). Body for PATCH: `frequency` (`weekly`, `bimonthly`, `monthly`; weekly and bimonthly need a paid plan), `scheduleEnabled`, `liveWebSearch` (true, false, or null to follow the account). Editor access.
+
+## Data sources
+
+Read-only. Connecting a source happens in the web app, since each one needs your own sign-in with the provider. The data reads need a paid plan.
+
+### `list_integrations`
+```
+GET /api/v1/brands/:id/integrations
+```
+The brand's sources and their state. Free accounts get the list too, with `locked: true`.
+
+### `get_ai_arrivals`
+```
+GET /api/v1/brands/:id/arrivals
+```
+Visits from AI engines over the last 90 days, from Google Analytics or PostHog: totals, by referrer and by landing page. Optional query param `page` (a path such as `/pricing`) for one page, with the site total.
+
+### `get_crawler_traffic`
+```
+GET /api/v1/brands/:id/crawler-traffic
+```
+AI crawler visits from Cloudflare: bots grouped by purpose, pages crawled, crawl errors, verified vs spoofed, and the AI bot blocking setting. `traffic` is null when Cloudflare isn't connected.
+
+### `get_search_queries`
+```
+GET /api/v1/brands/:id/search-queries
+```
+Search Console and Bing queries the site shows up for, with clicks, impressions and position, grouped by phrasing and marked when a prompt already tracks them. Optional query param `page` for one page's queries.
 
 ### `get_content_audit`
 ```
