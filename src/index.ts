@@ -56,9 +56,19 @@ async function apiFetch(
   return res.json();
 }
 
+function text(data: unknown) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+const searchLocationInput = z.object({
+  country: z.string().length(2).describe("ISO 3166-1 alpha-2 country code, e.g. IN, US, GB"),
+  region: z.string().optional().describe("State, province or other subdivision, e.g. Maharashtra"),
+  city: z.string().optional().describe("City, e.g. Mumbai"),
+});
+
 const server = new McpServer({
   name: "aeo-copilot",
-  version: "2.1.1",
+  version: "2.2.0",
 });
 
 // ── Tool: list_brands ─────────────────────────────────────────────────────────
@@ -258,7 +268,7 @@ server.tool(
 
 server.tool(
   "list_actions",
-  "List a Visibility-mode brand's actions: the work AEO Copilot found in its AI answers and pages, each tied to the prompts it affects. Types: cited_not_named (AI cites your page but names others), content_gap (no page answers the topic), page_structure (a fix on a specific page), source_opportunity (a site AI cites where you're not mentioned), site (site-wide). Statuses: triage (new, to decide), accepted (planned), done (before/after measured on later runs: `baseline` vs `result`, `measuredAt`), dismissed. Workflow: list triage actions, accept the ones worth doing with update_action, do the work, then mark them done. If `enabled` is false, Actions isn't switched on for this account yet; use get_recommendations instead.",
+  "List a Visibility-mode brand's actions: the work AEO Copilot found in its AI answers and pages, each tied to the prompts it affects. Types: cited_not_named (AI cites your page but names others), content_gap (no page answers the topic), page_structure (a fix on a specific page), source_opportunity (a site AI cites where you're not mentioned), site (site-wide). Statuses: triage (new, to decide), accepted (planned), done (before/after measured on later runs: `baseline` vs `result`, `measuredAt`), dismissed. Workflow: list triage actions, accept the ones worth doing with update_action, do the work, then mark them done. If `enabled` is false, Actions isn't switched on for this account yet, so there are no actions to list. Actions can also be `expired` (set by the system, never moved by hand); they appear only when listing without a status filter.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     status: z
@@ -325,7 +335,7 @@ server.tool(
 
 server.tool(
   "create_topic",
-  "Create a topic cluster for a brand. Topics group related prompts (e.g. 'Pricing Questions', 'Product Comparisons').",
+  "Create a topic cluster for a brand. Topics group related prompts (e.g. 'Pricing Questions', 'Product Comparisons'). Optionally set a search location (country, region, city) that all the topic's prompts run from.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     name: z.string().min(1).describe("Topic name"),
@@ -341,11 +351,16 @@ server.tool(
       .array(z.string())
       .optional()
       .describe("Keywords associated with this topic"),
+    searchLocation: searchLocationInput
+      .optional()
+      .describe(
+        "Where this topic's prompts are searched from. Every prompt in the topic runs from this place, so keep the location out of the prompt text. Omit for the engines' defaults."
+      ),
   },
-  async ({ brandId, name, description, pages, keywords }) => {
+  async ({ brandId, name, description, pages, keywords, searchLocation }) => {
     const data = await apiFetch(`/api/v1/brands/${brandId}/topics`, {
       method: "POST",
-      body: { name, description, pages, keywords },
+      body: { name, description, pages, keywords, searchLocation },
     });
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
@@ -540,7 +555,7 @@ server.tool(
 
 server.tool(
   "run_brand_prompts",
-  "Run all prompts for a brand on the engines the account has selected (up to 4 of ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews). Optionally filter to a single topic. Returns the count of prompts run.",
+  "Run all prompts for a brand on the engines the account has selected (up to 4 of ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews). Optionally filter to a single topic. Returns the count of prompts run once the live engines answered; use get_run_status to see answers still on their way.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
     topicId: z
@@ -566,7 +581,7 @@ server.tool(
 
 server.tool(
   "scan_brand",
-  "Run a technical audit on the brand's website. Returns the full scan result — same data the dashboard's technical scan view shows (schema markup, sitemap, llms.txt, etc.).",
+  "Run a new technical audit on the brand's website. Returns the full scan result — same data the dashboard's technical scan view shows (schema markup, sitemap, llms.txt, etc.). To read the last scan without running one, use get_scan_result.",
   {
     brandId: z.string().describe("The brand UUID from list_brands"),
   },
@@ -577,6 +592,181 @@ server.tool(
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     };
+  }
+);
+
+// ── Tool: get_scan_result ─────────────────────────────────────────────────────
+
+server.tool(
+  "get_scan_result",
+  "Read the brand's last technical audit (schema markup, sitemap, robots.txt, llms.txt, readability, issues) without running a new one. Returns a NO_SCAN error when the brand has never been scanned; run scan_brand then.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => text(await apiFetch(`/api/v1/brands/${brandId}/scan`))
+);
+
+// ── Tool: get_run_status ──────────────────────────────────────────────────────
+
+server.tool(
+  "get_run_status",
+  "Check whether a brand's latest answers have all arrived. run_brand_prompts returns once the live engines answered; some answers land later (BYOK tasks still running, a scheduled Claude batch). For each active prompt: when it last ran, which engines answered, which are still pending, and which failed with the reason. `complete` is true when nothing is pending. Also shows the scheduled run: in progress, last and next run. Optionally filter to one topic.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    topicId: z.string().optional().describe("Only this topic's prompts"),
+  },
+  async ({ brandId, topicId }) => {
+    const query = topicId ? `?topicId=${encodeURIComponent(topicId)}` : "";
+    return text(await apiFetch(`/api/v1/brands/${brandId}/run-status${query}`));
+  }
+);
+
+// ── Tool: update_topic ────────────────────────────────────────────────────────
+
+server.tool(
+  "update_topic",
+  "Edit a topic: rename it, change its description, target pages or keywords, or set, change or clear its search location. Only the fields you pass change; `pages` and `keywords` replace the saved list. Past results stay. Needs editor access to the brand.",
+  {
+    topicId: z.string().describe("The topic UUID from list_topics"),
+    name: z.string().min(1).optional().describe("New topic name"),
+    description: z.string().nullable().optional().describe("What this topic covers (null clears it)"),
+    pages: z.array(z.string()).optional().describe("Full list of target page URLs; replaces the saved list"),
+    keywords: z.array(z.string()).optional().describe("Full list of keywords; replaces the saved list"),
+    searchLocation: searchLocationInput
+      .nullable()
+      .optional()
+      .describe("Where the topic's prompts are searched from; null clears it so the engines use their defaults"),
+  },
+  async ({ topicId, ...fields }) => {
+    const body = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+    if (Object.keys(body).length === 0) {
+      throw new Error("Pass at least one field to change: name, description, pages, keywords or searchLocation.");
+    }
+    return text(await apiFetch(`/api/v1/topics/${topicId}`, { method: "PATCH", body }));
+  }
+);
+
+// ── Tool: delete_topic ────────────────────────────────────────────────────────
+
+server.tool(
+  "delete_topic",
+  "Delete a topic. Its prompts and their results are kept, ungrouped; the response says how many. To remove the prompts too, call delete_prompts first. Needs editor access to the brand.",
+  {
+    topicId: z.string().describe("The topic UUID from list_topics"),
+  },
+  async ({ topicId }) => text(await apiFetch(`/api/v1/topics/${topicId}`, { method: "DELETE" }))
+);
+
+// ── Tool: get_engine_settings ─────────────────────────────────────────────────
+
+server.tool(
+  "get_engine_settings",
+  "Read the account's engine settings: which engines runs use (`enabledEngines`), which the plan allows, the most that can be on at once, and the live web search default. They apply to every brand this account owns.",
+  {},
+  async () => text(await apiFetch(`/api/v1/settings/engines`))
+);
+
+// ── Tool: update_engine_settings ──────────────────────────────────────────────
+
+server.tool(
+  "update_engine_settings",
+  "Change which engines the account's runs use and/or the live web search default. `enabledEngines` replaces the selection (at least 1, at most the plan's maximum, from: chatgpt, claude, perplexity, googleaio, gemini). Live web search needs a paid plan; in Managed mode ChatGPT and Claude only search from a topic's location when it is on. Applies to every brand this account owns.",
+  {
+    enabledEngines: z
+      .array(z.enum(["chatgpt", "claude", "perplexity", "googleaio", "gemini"]))
+      .min(1)
+      .optional()
+      .describe("Full list of engines to run"),
+    liveWebSearch: z.boolean().optional().describe("Account default for live web search"),
+  },
+  async ({ enabledEngines, liveWebSearch }) => {
+    if (enabledEngines === undefined && liveWebSearch === undefined) {
+      throw new Error("Pass enabledEngines, liveWebSearch or both.");
+    }
+    return text(await apiFetch(`/api/v1/settings/engines`, { method: "PATCH", body: { enabledEngines, liveWebSearch } }));
+  }
+);
+
+// ── Tool: get_brand_settings ──────────────────────────────────────────────────
+
+server.tool(
+  "get_brand_settings",
+  "Read a brand's run settings: its schedule (frequency, on or off, last and next run), live web search (the brand's override, the account default and what runs actually use), the data source (managed or BYOK), and how precisely each engine runs from a topic's search location (city, country, hint or none).",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => text(await apiFetch(`/api/v1/brands/${brandId}/settings`))
+);
+
+// ── Tool: update_brand_settings ───────────────────────────────────────────────
+
+server.tool(
+  "update_brand_settings",
+  "Change a brand's run schedule and/or its live web search override. Weekly and bimonthly need a paid plan on the brand owner's account. Set liveWebSearch to null to follow the account default. Needs editor access to the brand.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    frequency: z.enum(["weekly", "bimonthly", "monthly"]).optional().describe("How often the prompts run on their own"),
+    scheduleEnabled: z.boolean().optional().describe("Turn scheduled runs on or off"),
+    liveWebSearch: z.boolean().nullable().optional().describe("Brand override for live web search; null follows the account default"),
+  },
+  async ({ brandId, ...fields }) => {
+    const body = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+    if (Object.keys(body).length === 0) {
+      throw new Error("Pass frequency, scheduleEnabled or liveWebSearch.");
+    }
+    return text(await apiFetch(`/api/v1/brands/${brandId}/settings`, { method: "PATCH", body }));
+  }
+);
+
+// ── Tool: list_integrations ───────────────────────────────────────────────────
+
+server.tool(
+  "list_integrations",
+  "List the brand's data sources (Search Console, Bing Webmaster Tools, Google Analytics, PostHog, Cloudflare) and whether each is connected. Connecting a source is done in the web app. `locked` is true on the free plan, where the data tools below are refused.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => text(await apiFetch(`/api/v1/brands/${brandId}/integrations`))
+);
+
+// ── Tool: get_ai_arrivals ─────────────────────────────────────────────────────
+
+server.tool(
+  "get_ai_arrivals",
+  "Visits that came from AI engines (ChatGPT, Perplexity, Claude, Gemini and others) over the last 90 days, from Google Analytics or PostHog: totals, by referrer and by landing page. Pass `page` (a path such as /pricing) for one page, with the site total next to it. `connected` is false when neither source is connected. Paid plans.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    page: z.string().optional().describe("A page path, e.g. /pricing"),
+  },
+  async ({ brandId, page }) => {
+    const query = page ? `?page=${encodeURIComponent(page)}` : "";
+    return text(await apiFetch(`/api/v1/brands/${brandId}/arrivals${query}`));
+  }
+);
+
+// ── Tool: get_crawler_traffic ─────────────────────────────────────────────────
+
+server.tool(
+  "get_crawler_traffic",
+  "AI crawler visits to the brand's site from Cloudflare: each bot grouped by what it does (fetching a page someone asked about, building an AI search index, training, classic search), the pages crawled most, crawl errors, verified vs spoofed bots, and Cloudflare's AI bot blocking setting. `traffic` is null when Cloudflare isn't connected. Paid plans.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+  },
+  async ({ brandId }) => text(await apiFetch(`/api/v1/brands/${brandId}/crawler-traffic`))
+);
+
+// ── Tool: get_search_queries ──────────────────────────────────────────────────
+
+server.tool(
+  "get_search_queries",
+  "The questions people search on Google (Search Console) and Bing (Webmaster Tools) that the brand's site shows up for, with clicks, impressions and position. Without `page`: every query for the site, grouped by phrasing, marked when a prompt already tracks it and with the topic it would fit. With `page` (a path such as /pricing): that page's queries. Paid plans.",
+  {
+    brandId: z.string().describe("The brand UUID from list_brands"),
+    page: z.string().optional().describe("A page path, e.g. /pricing"),
+  },
+  async ({ brandId, page }) => {
+    const query = page ? `?page=${encodeURIComponent(page)}` : "";
+    return text(await apiFetch(`/api/v1/brands/${brandId}/search-queries${query}`));
   }
 );
 
